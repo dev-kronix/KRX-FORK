@@ -52,16 +52,18 @@ async function bootstrap() {
   );
 
   const options = new DocumentBuilder()
-    .setTitle('API')
-    .setDescription('API docs')
+    .setTitle('KRX API')
+    .setDescription('API REST oficial da KRX')
     .setVersion('1.0')
     .addBearerAuth()
+    .addServer('https://api.krxdev.tech', 'Produção')
+    .addServer('http://localhost:3001', 'Desenvolvimento')
     .addGlobalParameters({
       in: 'header',
       required: false,
       name: process.env.APP_HEADER_LANGUAGE || 'x-custom-lang',
       schema: {
-        example: 'en',
+        example: 'pt-BR',
       },
     })
     .build();

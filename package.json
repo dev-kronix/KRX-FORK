@@ -1,8 +1,8 @@
 {
-  "name": "nestjs-boilerplate",
-  "version": "1.2.0",
-  "description": "",
-  "author": "",
+  "name": "krx-api",
+  "version": "0.1.0",
+  "description": "API REST oficial da KRX.",
+  "author": "KRX",
   "private": true,
   "license": "MIT",
   "scripts": {
@@ -156,8 +156,8 @@
     "testEnvironment": "node"
   },
   "engines": {
-    "node": ">=16.0.0",
-    "npm": ">=8.0.0"
+    "node": ">=24.0.0",
+    "npm": ">=11.0.0"
   },
   "release-it": {
     "git": {
