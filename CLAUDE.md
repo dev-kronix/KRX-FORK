@@ -22,6 +22,6 @@ Depois de alterar entidades, gere e revise a migration antes de executá-la.
 - Documentação, mensagens ao usuário e conteúdo funcional da KRX devem ser escritos em português do Brasil.
 - O idioma padrão da API é `pt-BR`.
 - O site oficial é `https://krxdev.tech`.
-- A API oficial é `https://api.krxdev.tech`.
+- A API oficial é `https://krxdev.tech`.
 - Novas rotas devem manter o versionamento existente em `/api/v1`.
 - Não coloque segredos, tokens ou credenciais reais no repositório.

@@ -9,7 +9,7 @@ Todas as mudanças relevantes da KRX API serão registradas neste arquivo.
 - Fork adotado oficialmente como base da KRX API.
 - Identidade do pacote alterada para `krx-api`.
 - Documentação principal reescrita em português do Brasil.
-- Domínios definidos como `krxdev.tech` e `api.krxdev.tech`.
+- Domínio oficial definido como `krxdev.tech` para site e API.
 - Swagger identificado como KRX API e configurado com servidores de produção e desenvolvimento.
 
 ### Internacionalização

@@ -5,12 +5,12 @@ Backend REST oficial da **KRX**, construído com NestJS e TypeScript.
 ## Domínios
 
 - Site: `https://krxdev.tech`
-- API: `https://api.krxdev.tech`
-- Documentação Swagger: `https://api.krxdev.tech/docs`
+- API: `https://krxdev.tech`
+- Documentação Swagger: `https://krxdev.tech/docs`
 - Prefixo padrão da API: `/api`
 - Versionamento atual: `/v1`
 
-Exemplo: `https://api.krxdev.tech/api/v1/auth/me`.
+Exemplo: `https://krxdev.tech/api/v1/auth/me`.
 
 ## Stack
 
@@ -77,7 +77,7 @@ Os domínios oficiais esperados são:
 
 ```env
 FRONTEND_DOMAIN=https://krxdev.tech
-BACKEND_DOMAIN=https://api.krxdev.tech
+BACKEND_DOMAIN=https://krxdev.tech
 APP_CORS_ORIGINS=https://krxdev.tech,https://www.krxdev.tech
 ```
 

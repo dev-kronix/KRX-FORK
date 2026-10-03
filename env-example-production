@@ -5,7 +5,7 @@ API_PREFIX=api
 APP_FALLBACK_LANGUAGE=pt-BR
 APP_HEADER_LANGUAGE=accept-language
 FRONTEND_DOMAIN=https://krxdev.tech
-BACKEND_DOMAIN=https://api.krxdev.tech
+BACKEND_DOMAIN=https://krxdev.tech
 APP_CORS_ORIGINS=https://krxdev.tech,https://www.krxdev.tech
 
 DATABASE_TYPE=postgres

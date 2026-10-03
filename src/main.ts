@@ -56,7 +56,7 @@ async function bootstrap() {
     .setDescription('API REST oficial da KRX')
     .setVersion('1.0')
     .addBearerAuth()
-    .addServer('https://api.krxdev.tech', 'Produção')
+    .addServer('https://krxdev.tech', 'Produção')
     .addServer('http://localhost:3001', 'Desenvolvimento')
     .addGlobalParameters({
       in: 'header',
