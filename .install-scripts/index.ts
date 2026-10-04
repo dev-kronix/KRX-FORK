@@ -1,7 +1,4 @@
 import prompts from 'prompts';
-import removeFacebookAuth from './scripts/remove-auth-facebook';
-import removeGoogleAuth from './scripts/remove-auth-google';
-import removeAppleAuth from './scripts/remove-auth-apple';
 import removeInstallScripts from './scripts/remove-install-scripts';
 import removePostgreSql from './scripts/remove-postgresql';
 import removeMongoDb from './scripts/remove-mongodb';
@@ -24,24 +21,6 @@ void (async () => {
           { title: 'PostgreSQL', value: 'pg' },
           { title: 'MongoDB', value: 'mongo' },
         ],
-      },
-      {
-        type: 'confirm',
-        name: 'isAuthFacebook',
-        message: 'Include Facebook auth?',
-        initial: true,
-      },
-      {
-        type: 'confirm',
-        name: 'isAuthGoogle',
-        message: 'Include Google auth?',
-        initial: true,
-      },
-      {
-        type: 'confirm',
-        name: 'isAuthApple',
-        message: 'Include Apple auth?',
-        initial: true,
       },
     ],
     {
@@ -72,18 +51,6 @@ void (async () => {
     removeDocumentPropertyGeneration();
     removeAllDbResourceGeneration();
     removeAllDbPropertyGeneration();
-  }
-
-  if (!response.isAuthFacebook) {
-    removeFacebookAuth();
-  }
-
-  if (!response.isAuthGoogle) {
-    removeGoogleAuth();
-  }
-
-  if (!response.isAuthApple) {
-    removeAppleAuth();
   }
 
   removeInstallScripts();
