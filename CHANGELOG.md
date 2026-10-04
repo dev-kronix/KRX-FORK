@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1 - 2026-10-04
+
+### Autenticação
+
+- Login social simplificado para Google como único provedor suportado.
+- Integrações de Facebook e Apple removidas do código ativo e das variáveis de ambiente.
+- Dependência `apple-signin-auth` removida.
+
 Todas as mudanças relevantes da KRX API serão registradas neste arquivo.
 
 ## 0.1.0 - 2026-10-03
