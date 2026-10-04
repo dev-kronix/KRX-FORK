@@ -24,7 +24,7 @@ Exemplo: `https://krxdev.tech/api/v1/auth/me`.
 - Confirmação de e-mail
 - Recuperação de senha
 - Roles e autorização
-- Login social com Google, Facebook e Apple
+- Login social com Google
 - Upload local e Amazon S3
 - I18N com **pt-BR como idioma padrão**
 - Swagger / OpenAPI
@@ -71,7 +71,7 @@ Use `env-example-production` como referência para a VPS:
 cp env-example-production .env
 ```
 
-Antes de subir, substitua todos os valores `CHANGE_ME_*` e configure banco, SMTP, storage e credenciais sociais de forma segura.
+Antes de subir, substitua todos os valores `CHANGE_ME_*` e configure banco, SMTP, storage e credenciais do Google de forma segura.
 
 Os domínios oficiais esperados são:
 
