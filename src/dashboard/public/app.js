@@ -64,7 +64,11 @@
   function authenticatedDestination() {
     const target = sessionStorage.getItem('krx.dashboard.return') || '#/';
     sessionStorage.removeItem('krx.dashboard.return');
-    return /^#\/(catalog|playground)(\?route=[a-z0-9_-]{1,80})?$/.test(target)
+    return /^#\/(catalog|playground)(\?route=[a-z0-9_-]{1,80})?$/.test(
+      target,
+    ) ||
+      /^#\/(support|support-admin)(\?ticket=[a-f0-9-]{36})?$/.test(target) ||
+      target === '#/notifications'
       ? target
       : '#/';
   }
@@ -189,6 +193,9 @@
         '#/billing-payments': 'Vendas',
         '#/credits': 'Ajustes de créditos',
         '#/users': 'Usuários',
+        '#/support': 'Suporte',
+        '#/support-admin': 'Central de chamados',
+        '#/notifications': 'Notificações',
         '#/profile': 'Perfil e segurança',
       };
       document.querySelector('#workspaceTitle').textContent =
@@ -1697,6 +1704,144 @@
     }
   }
 
+  function supportPath(admin) {
+    return admin ? '/admin/support' : '/support';
+  }
+  function supportHash(admin) {
+    return admin ? '#/support-admin' : '#/support';
+  }
+  function supportStatus(status) {
+    return status === 'closed' ? 'Encerrado' : 'Aberto';
+  }
+  async function supportView(params, admin = false) {
+    if (admin && roleName(currentUser) !== 'admin') {
+      location.hash = '#/';
+      return;
+    }
+    setNav(true);
+    const id = params.get('ticket');
+    if (id) return ticketView(id, admin);
+    const page = Math.max(1, Number(params.get('page')) || 1);
+    app.innerHTML =
+      '<div class="loading-shell" role="status">Carregando chamados…</div>';
+    try {
+      const result = await api(
+        supportPath(admin) + '?page=' + page + '&limit=20',
+      );
+      app.innerHTML = `<div class="page-header"><div><p class="eyebrow">${admin ? 'Administração' : 'Atendimento'}</p><h1>${admin ? 'Central de chamados' : 'Suporte'}</h1><p class="muted">${admin ? 'Leia o contexto, responda e acompanhe cada solicitação.' : 'Converse com a equipe e acompanhe suas solicitações.'}</p></div><span class="tag">${result.total} chamados</span></div><div id="notice" role="status"></div>
+      ${!admin ? `<section class="card"><h2>Novo chamado</h2><form id="ticketForm"><label>Assunto<input name="subject" maxlength="120" required placeholder="Como podemos ajudar?"></label><label>Mensagem<textarea name="body" maxlength="4000" rows="5" required placeholder="Descreva o problema e o que você já tentou. Não envie senhas ou chaves de API."></textarea></label><div class="actions"><button class="button" type="submit">Abrir chamado</button><span class="muted">Até 4.000 caracteres. Atendimento por texto.</span></div></form></section>` : ''}
+      <section class="card"><h2>${admin ? 'Fila de atendimento' : 'Seus chamados'}</h2>${result.data.length ? `<div class="ticket-list">${result.data.map((t) => `<a class="ticket-row" href="${supportHash(admin)}?ticket=${esc(t.id)}"><div><strong>${esc(t.subject)}</strong><p class="muted">${admin ? 'Conta #' + esc(t.userId) + ' · ' : ''}Atualizado em ${esc(new Date(t.updatedAt).toLocaleString('pt-BR'))}</p></div><span class="tag ${t.status === 'open' ? 'green' : ''}">${supportStatus(t.status)}</span></a>`).join('')}</div>` : '<div class="empty-state"><h3>Nenhum chamado por aqui</h3><p>As solicitações aparecerão aqui quando forem abertas.</p></div>'}<div class="actions">${page > 1 ? `<a class="button alt" href="${supportHash(admin)}?page=${page - 1}">Anterior</a>` : ''}${page * 20 < result.total ? `<a class="button alt" href="${supportHash(admin)}?page=${page + 1}">Próxima</a>` : ''}</div></section>`;
+      const form = document.querySelector('#ticketForm');
+      if (form) {
+        let requestId = crypto.randomUUID();
+        let attempt = null;
+        form.onsubmit = async (event) => {
+          event.preventDefault();
+          const button = form.querySelector('button');
+          const fields = new FormData(form);
+          const payload = {
+            subject: fields.get('subject').trim(),
+            body: fields.get('body').trim(),
+          };
+          const fingerprint = JSON.stringify(payload);
+          if (attempt && attempt !== fingerprint)
+            requestId = crypto.randomUUID();
+          attempt = fingerprint;
+          button.disabled = true;
+          try {
+            const t = await api('/support', {
+              method: 'POST',
+              body: JSON.stringify({ ...payload, requestId }),
+            });
+            location.hash = '#/support?ticket=' + t.id;
+          } catch (error) {
+            notice(error.message, true);
+            button.disabled = false;
+          }
+        };
+      }
+    } catch (error) {
+      app.innerHTML = '<h1>Suporte</h1><div id="notice" role="status"></div>';
+      notice(error.message, true);
+    }
+  }
+  async function ticketView(id, admin) {
+    try {
+      const ticket = await api(
+        supportPath(admin) + '/' + encodeURIComponent(id),
+      );
+      app.innerHTML = `<div class="page-header"><div><a class="muted" href="${supportHash(admin)}">← Todos os chamados</a><h1>${esc(ticket.subject)}</h1><p class="muted">Chamado ${esc(ticket.id)}${admin ? ' · Conta #' + esc(ticket.userId) : ''}</p></div><span class="tag ${ticket.status === 'open' ? 'green' : ''}">${supportStatus(ticket.status)}</span></div><div id="notice" role="status"></div><section class="card"><div class="actions"><button id="ticketStatus" class="button alt">${ticket.status === 'open' ? 'Encerrar chamado' : 'Reabrir chamado'}</button></div><div class="conversation" aria-label="Histórico da conversa">${ticket.messages.map((m) => `<article class="message ${m.isAdmin ? 'staff' : ''}"><div class="message-meta"><strong>${m.isAdmin ? 'Equipe KRX' : 'Cliente'}</strong><time>${esc(new Date(m.createdAt).toLocaleString('pt-BR'))}</time></div><p>${esc(m.body)}</p></article>`).join('')}</div>${ticket.status === 'open' ? '<form id="replyForm"><label>Resposta<textarea name="body" maxlength="4000" rows="5" required placeholder="Escreva sua mensagem"></textarea></label><button class="button" type="submit">Enviar resposta</button></form>' : '<div class="empty-state"><h3>Conversa encerrada</h3><p>Reabra o chamado para continuar o atendimento.</p></div>'}</section>`;
+      document.querySelector('#ticketStatus').onclick = async (event) => {
+        event.target.disabled = true;
+        try {
+          await api(supportPath(admin) + '/' + id + '/status', {
+            method: 'PATCH',
+            body: JSON.stringify({
+              status: ticket.status === 'open' ? 'closed' : 'open',
+            }),
+          });
+          await ticketView(id, admin);
+        } catch (error) {
+          notice(error.message, true);
+          event.target.disabled = false;
+        }
+      };
+      const form = document.querySelector('#replyForm');
+      if (form) {
+        let requestId = crypto.randomUUID();
+        let previous = null;
+        form.onsubmit = async (event) => {
+          event.preventDefault();
+          const button = form.querySelector('button');
+          const body = new FormData(form).get('body').trim();
+          if (previous !== null && body !== previous)
+            requestId = crypto.randomUUID();
+          previous = body;
+          button.disabled = true;
+          try {
+            await api(supportPath(admin) + '/' + id + '/messages', {
+              method: 'POST',
+              body: JSON.stringify({ body, requestId }),
+            });
+            await ticketView(id, admin);
+          } catch (error) {
+            notice(error.message, true);
+            button.disabled = false;
+          }
+        };
+      }
+    } catch (error) {
+      app.innerHTML = '<h1>Chamado</h1><div id="notice" role="status"></div>';
+      notice(error.message, true);
+    }
+  }
+  async function notificationsView(params) {
+    setNav(true);
+    const page = Math.max(1, Number(params.get('page')) || 1);
+    try {
+      const result = await api('/notifications?page=' + page + '&limit=20');
+      app.innerHTML = `<div class="page-header"><div><p class="eyebrow">Sua conta</p><h1>Notificações</h1><p class="muted">Respostas e atualizações dos seus chamados.</p></div><span class="tag">${result.unread} não lidas</span></div><div id="notice" role="status"></div><section class="card">${result.data.length ? result.data.map((n) => `<article class="notification-row ${n.readAt ? '' : 'unread'}"><div><strong>${esc(n.title)}</strong><p class="muted">${esc(new Date(n.createdAt).toLocaleString('pt-BR'))} · ${n.readAt ? 'Lida' : 'Não lida'}</p><a href="#/support?ticket=${esc(n.ticketId)}">Ver chamado</a></div>${n.readAt ? '' : `<button class="button alt" data-read="${esc(n.id)}">Marcar como lida</button>`}</article>`).join('') : '<div class="empty-state"><h3>Tudo em dia</h3><p>Você ainda não recebeu notificações.</p></div>'}<div class="actions">${page > 1 ? `<a class="button alt" href="#/notifications?page=${page - 1}">Anterior</a>` : ''}${page * 20 < result.total ? `<a class="button alt" href="#/notifications?page=${page + 1}">Próxima</a>` : ''}</div></section>`;
+      app.querySelectorAll('[data-read]').forEach((button) => {
+        button.onclick = async () => {
+          button.disabled = true;
+          try {
+            await api('/notifications/' + button.dataset.read + '/read', {
+              method: 'PATCH',
+            });
+            await notificationsView(params);
+          } catch (error) {
+            notice(error.message, true);
+            button.disabled = false;
+          }
+        };
+      });
+    } catch (error) {
+      app.innerHTML =
+        '<h1>Notificações</h1><div id="notice" role="status"></div>';
+      notice(error.message, true);
+    }
+  }
+
   async function logout() {
     try {
       await api('/auth/logout', { method: 'POST' });
@@ -1727,6 +1872,16 @@
             (hash === '#/playground' &&
             /^[a-z0-9_-]{1,80}$/.test(requestedRoute || '')
               ? '?route=' + requestedRoute
+              : ''),
+        );
+      }
+      if (['#/support', '#/support-admin', '#/notifications'].includes(hash)) {
+        const ticket = params.get('ticket');
+        sessionStorage.setItem(
+          'krx.dashboard.return',
+          hash +
+            (hash !== '#/notifications' && /^[a-f0-9-]{36}$/.test(ticket || '')
+              ? '?ticket=' + ticket
               : ''),
         );
       }
@@ -1761,6 +1916,9 @@
       notice(message, failed);
       return;
     }
+    if (hash === '#/support') return supportView(params);
+    if (hash === '#/support-admin') return supportView(params, true);
+    if (hash === '#/notifications') return notificationsView(params);
     if (hash === '#/catalog') return catalogView();
     if (hash === '#/playground') return playgroundView(params);
     if (hash === '#/billing') return billingView();

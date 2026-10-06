@@ -26,6 +26,7 @@ import { DatabaseConfig } from './database/config/database-config.type';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PlatformModule } from './platform/platform.module';
 import { CatalogModule } from './catalog/catalog.module';
+import { SupportModule } from './support/support.module';
 import { BillingModule } from './billing/billing.module';
 
 // <database-block>
@@ -91,7 +92,7 @@ const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
     DashboardModule,
     ...((databaseConfig() as DatabaseConfig).isDocumentDatabase
       ? []
-      : [PlatformModule, BillingModule, CatalogModule]),
+      : [PlatformModule, BillingModule, CatalogModule, SupportModule]),
   ],
 })
 export class AppModule {}

@@ -914,3 +914,104 @@ code,
 .code-panel code {
   font-size: 12px;
 }
+
+.ticket-row,
+.notification-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.2rem 0;
+  border-bottom: 1px solid var(--line);
+  text-decoration: none;
+  color: inherit;
+}
+.ticket-row:hover strong {
+  color: var(--accent);
+}
+.ticket-row p,
+.notification-row p {
+  margin: 0.4rem 0;
+  font-size: 0.85rem;
+}
+.conversation {
+  display: grid;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+.message {
+  padding: 1.2rem;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.message.staff {
+  border-left: 3px solid var(--accent);
+}
+.message-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.85rem;
+}
+.message-meta time {
+  color: var(--muted);
+}
+.message p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+}
+.notification-row.unread strong {
+  color: var(--accent);
+}
+@media (max-width: 760px) {
+  .notification-row,
+  .message-meta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 0 0 24px;
+}
+.page-header h1 {
+  overflow-wrap: anywhere;
+}
+.page-header .eyebrow {
+  margin-bottom: 8px;
+}
+.page-header ~ .card + .card {
+  margin-top: 18px;
+}
+.page-header ~ .card textarea {
+  font-family: inherit;
+}
+.page-header ~ .card .actions {
+  flex-wrap: wrap;
+}
+.ticket-row strong,
+.notification-row strong {
+  overflow-wrap: anywhere;
+}
+.ticket-row > div,
+.notification-row > div {
+  min-width: 0;
+}
+.page-header .tag,
+.ticket-row .tag {
+  flex-shrink: 0;
+}
+@media (max-width: 760px) {
+  .page-header {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .ticket-row {
+    align-items: flex-start;
+  }
+}
