@@ -152,3 +152,7 @@ Consulte [o guia da primeira etapa](docs/PLATFORM-PHASE-1.md) para migração no
 ## Planos e pagamentos
 
 O dashboard inclui catálogo de planos, compras avulsas pelo Mercado Pago, histórico e administração. Planos recuperados começam desativados. Consulte [o guia da segunda etapa](docs/PLATFORM-PHASE-2.md) para migração, configuração no Coolify, webhook, testes e regras de revisão de pagamentos.
+
+## Catálogo e playground
+
+O dashboard recupera 219 contratos antigos, organizados por categoria, com parâmetros, schemas e exemplos copiáveis. As integrações aguardam migração; oito leituras da plataforma atual podem ser executadas no playground. Consulte [o guia da terceira etapa](docs/PLATFORM-PHASE-3.md).

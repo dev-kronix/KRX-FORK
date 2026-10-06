@@ -93,3 +93,8 @@ button:disabled{opacity:.5;cursor:not-allowed}
 
 .check-field { display: flex; align-items: center; gap: .6rem; }
 .check-field input { width: auto; }
+
+.catalog-group { margin-top: 2rem; }
+.card > code, #requestUrl { display: block; overflow-wrap: anywhere; }
+.code-panel { max-height: 30rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: #080b08; border: 1px solid #273027; padding: 1rem; border-radius: .5rem; font-size: .85rem; }
+#playgroundForm textarea { width: 100%; font-family: monospace; resize: vertical; }
