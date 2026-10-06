@@ -34,9 +34,9 @@ export class MailService {
     const url = new URL(
       this.configService.getOrThrow('app.frontendDomain', {
         infer: true,
-      }) + '/confirm-email',
+      }) + '/dashboard/#/confirm-email',
     );
-    url.searchParams.set('hash', mailData.data.hash);
+    url.hash += '?hash=' + encodeURIComponent(mailData.data.hash);
 
     await this.mailerService.sendMail({
       to: mailData.to,
@@ -86,10 +86,10 @@ export class MailService {
     const url = new URL(
       this.configService.getOrThrow('app.frontendDomain', {
         infer: true,
-      }) + '/password-change',
+      }) + '/dashboard/#/reset-password',
     );
-    url.searchParams.set('hash', mailData.data.hash);
-    url.searchParams.set('expires', mailData.data.tokenExpires.toString());
+    url.hash += '?hash=' + encodeURIComponent(mailData.data.hash);
+    url.hash += '&expires=' + mailData.data.tokenExpires.toString();
 
     await this.mailerService.sendMail({
       to: mailData.to,
@@ -138,9 +138,9 @@ export class MailService {
     const url = new URL(
       this.configService.getOrThrow('app.frontendDomain', {
         infer: true,
-      }) + '/confirm-new-email',
+      }) + '/dashboard/#/confirm-new-email',
     );
-    url.searchParams.set('hash', mailData.data.hash);
+    url.hash += '?hash=' + encodeURIComponent(mailData.data.hash);
 
     await this.mailerService.sendMail({
       to: mailData.to,

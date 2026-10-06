@@ -150,9 +150,14 @@ describe('Auth Module', () => {
               (letter: MailMessage) =>
                 letter.to[0].address.toLowerCase() ===
                   userEmail.toLowerCase() &&
-                /.*password\-change\?hash\=([^&\s]+).*/g.test(letter.text),
+                /.*(?:password\-change|reset\-password)\?hash\=([^&\s]+).*/g.test(
+                  letter.text,
+                ),
             )
-            ?.text.replace(/.*password\-change\?hash\=([^&\s]+).*/g, '$1'),
+            ?.text.replace(
+              /.*(?:password\-change|reset\-password)\?hash\=([^&\s]+).*/g,
+              '$1',
+            ),
         );
 
       await request(app)

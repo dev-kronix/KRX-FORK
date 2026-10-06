@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import helmet from 'helmet';
+import type { Request, Response } from 'express';
 import {
   ClassSerializerInterceptor,
   ValidationPipe,
@@ -19,6 +20,20 @@ import { ResolvePromisesInterceptor } from './utils/serializer.interceptor';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
+  app.use(
+    ['/confirm-email', '/confirm-new-email', '/password-change'],
+    (req: Request, res: Response) => {
+      const pathname = req.originalUrl.split('?')[0];
+      const page =
+        pathname === '/password-change' ? 'reset-password' : pathname.slice(1);
+      const hash = typeof req.query.hash === 'string' ? req.query.hash : '';
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('Referrer-Policy', 'no-referrer');
+      res.redirect(
+        '/dashboard/#/' + page + '?hash=' + encodeURIComponent(hash),
+      );
+    },
+  );
   app.useStaticAssets(path.join(__dirname, 'dashboard', 'public'), {
     prefix: '/dashboard',
   });
