@@ -156,3 +156,7 @@ O dashboard inclui catálogo de planos, compras avulsas pelo Mercado Pago, hist�
 ## Catálogo e playground
 
 O catálogo mostra somente oito leituras já implementadas, organizadas em conta, consumo e pagamentos. O playground executa essas leituras com a sessão do usuário e exibe resultados reais. Integrações que ainda não existem não aparecem no catálogo. Consulte [o guia da terceira etapa](docs/PLATFORM-PHASE-3.md).
+
+### Suporte e notificações
+
+Chamados por conta, conversa com a equipe, encerramento/reabertura e avisos internos com leitura persistida estão implementados. A administração acompanha a fila de atendimento. Consulte [o guia da quarta etapa](docs/PLATFORM-PHASE-4.md) para contratos e migração no Coolify.
