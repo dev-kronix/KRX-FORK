@@ -61,9 +61,18 @@
     }
   }
 
+  function authenticatedDestination() {
+    const target = sessionStorage.getItem('krx.dashboard.return') || '#/';
+    sessionStorage.removeItem('krx.dashboard.return');
+    return /^#\/(catalog|playground)(\?route=[a-z0-9_-]{1,80})?$/.test(target)
+      ? target
+      : '#/';
+  }
+
   function clearSession() {
     Object.values(keys).forEach((key) => sessionStorage.removeItem(key));
     currentUser = null;
+    sessionStorage.removeItem('krx.dashboard.return');
   }
 
   async function refreshSession() {
@@ -177,7 +186,10 @@
         authenticated && roleName(currentUser) === 'admin' ? '' : 'none';
     });
     nav?.querySelectorAll('a[href^="#/"]').forEach((a) => {
-      a.classList.toggle('active', a.getAttribute('href') === location.hash);
+      a.classList.toggle(
+        'active',
+        a.getAttribute('href') === location.hash.split('?')[0],
+      );
     });
   }
 
@@ -218,7 +230,7 @@
             }),
           });
           saveSession(data);
-          location.hash = '#/';
+          location.hash = authenticatedDestination();
           // hashchange renders the authenticated page.
         } catch (error) {
           notice(error.message, true);
@@ -315,7 +327,7 @@
               body: JSON.stringify({ idToken: response.credential }),
             });
             saveSession(data);
-            location.hash = '#/';
+            location.hash = authenticatedDestination();
             // hashchange renders the authenticated page.
           } catch (error) {
             notice(error.message, true);
@@ -1239,6 +1251,420 @@
     }
   }
 
+  const readablePaths = new Set([
+    '/api/v1/auth/me',
+    '/api/v1/keys',
+    '/api/v1/usage/summary',
+    '/api/v1/usage/recent',
+    '/api/v1/usage/ledger',
+    '/api/v1/billing/plans',
+    '/api/v1/billing/subscription',
+    '/api/v1/billing/payments',
+  ]);
+  const authLabel = {
+    none: 'Pública',
+    session: 'Sessão JWT',
+    apiKey: 'Chave de API',
+  };
+  async function loadCatalog() {
+    const response = await api(
+      roleName(currentUser) === 'admin' ? '/admin/catalog' : '/catalog',
+    );
+    return response.data;
+  }
+  const searchText = (value) =>
+    String(value)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+  async function catalogView() {
+    setNav(true);
+    app.innerHTML =
+      '<div class="eyebrow">KRX / CATÁLOGO</div><h1>Contratos da API.</h1><div id="notice" hidden></div>';
+    try {
+      const catalog = await loadCatalog();
+      app.insertAdjacentHTML(
+        'beforeend',
+        '<p class="muted">' +
+          esc(catalog.routeCount) +
+          ' contratos visíveis. Integrações antigas aguardam migração; os contratos da plataforma atual estão disponíveis para leitura.</p><section class="card"><label for="catalogSearch">Buscar nome, rota ou descrição</label><input id="catalogSearch" type="search" placeholder="GPT, downloads, Free Fire..."><label for="catalogCategory">Categoria</label><select id="catalogCategory"><option value="">Todas</option>' +
+          catalog.categories
+            .map(
+              (c) =>
+                '<option value="' +
+                esc(c.id) +
+                '">' +
+                esc(c.name) +
+                ' (' +
+                c.routes.length +
+                ')</option>',
+            )
+            .join('') +
+          '</select></section><div id="catalogResults"></div>',
+      );
+      const render = () => {
+        const query = searchText(
+          document.querySelector('#catalogSearch').value,
+        );
+        const category = document.querySelector('#catalogCategory').value;
+        const visible = catalog.categories
+          .filter((c) => !category || c.id === category)
+          .map((c) => ({
+            ...c,
+            routes: c.routes.filter((r) =>
+              searchText(
+                r.name + ' ' + r.path + ' ' + r.summary + ' ' + c.name,
+              ).includes(query),
+            ),
+          }))
+          .filter((c) => c.routes.length);
+        document.querySelector('#catalogResults').innerHTML =
+          visible
+            .map(
+              (c) =>
+                '<section class="catalog-group"><h2>' +
+                esc(c.name) +
+                '</h2><p class="muted">' +
+                esc(c.description) +
+                '</p><div class="grid two">' +
+                c.routes
+                  .map(
+                    (r) =>
+                      '<article class="card"><span class="eyebrow">' +
+                      esc(r.method) +
+                      ' · ' +
+                      esc(authLabel[r.auth]) +
+                      '</span><h3>' +
+                      esc(r.name) +
+                      '</h3><code>' +
+                      esc(r.path) +
+                      '</code><p>' +
+                      esc(r.summary) +
+                      '</p><p class="muted">' +
+                      (r.executable
+                        ? 'Disponível · '
+                        : 'Aguardando migração · Custo do legado: ') +
+                      esc(r.credits) +
+                      ' crédito(s)</p><a class="button alt" href="#/playground?route=' +
+                      encodeURIComponent(r.id) +
+                      '">Abrir playground</a></article>',
+                  )
+                  .join('') +
+                '</div></section>',
+            )
+            .join('') || '<p class="muted">Nenhum contrato encontrado.</p>';
+      };
+      document
+        .querySelector('#catalogSearch')
+        .addEventListener('input', render);
+      document
+        .querySelector('#catalogCategory')
+        .addEventListener('change', render);
+      render();
+    } catch (error) {
+      notice(error.message, true);
+    }
+  }
+  async function playgroundView(params) {
+    setNav(true);
+    app.innerHTML =
+      '<div class="eyebrow">KRX / PLAYGROUND</div><h1>Monte sua requisição.</h1><div id="notice" hidden></div>';
+    try {
+      const catalog = await loadCatalog();
+      const routes = catalog.categories.flatMap((c) =>
+        c.routes.map((r) => ({ ...r, categoryName: c.name })),
+      );
+      const selected = params.get('route') || 'current-usage';
+      const route = routes.find((r) => r.id === selected);
+      if (!route) {
+        notice('Contrato não encontrado ou indisponível para sua conta.', true);
+        return;
+      }
+      const helpers = window.KrxPlayground;
+      const canRun =
+        route.source === 'current' &&
+        route.executable === true &&
+        route.method === 'GET' &&
+        readablePaths.has(route.path);
+      app.insertAdjacentHTML(
+        'beforeend',
+        '<section class="card"><label for="playgroundRoute">Contrato</label><select id="playgroundRoute">' +
+          catalog.categories
+            .map(
+              (c) =>
+                '<optgroup label="' +
+                esc(c.name) +
+                '">' +
+                c.routes
+                  .map(
+                    (r) =>
+                      '<option value="' +
+                      esc(r.id) +
+                      '" ' +
+                      (r.id === selected ? 'selected' : '') +
+                      '>' +
+                      esc(r.method + ' ' + r.name) +
+                      '</option>',
+                  )
+                  .join('') +
+                '</optgroup>',
+            )
+            .join('') +
+          '</select><h2>' +
+          esc(route.name) +
+          '</h2><code>' +
+          esc(route.method + ' ' + route.path) +
+          '</code><p>' +
+          esc(route.description) +
+          '</p><p class="muted">' +
+          esc(authLabel[route.auth]) +
+          ' · ' +
+          esc(route.credits) +
+          ' crédito(s)' +
+          (canRun
+            ? ' · Leitura disponível'
+            : ' · Contrato legado, aguardando migração') +
+          '</p>' +
+          (!canRun
+            ? '<p class="notice">A execução deste contrato será liberada após a migração da integração. Os exemplos abaixo servem para preparar seu código.</p>'
+            : '<p class="notice">Usa a sessão desta conta. Os exemplos copiados contêm apenas placeholders de credenciais.</p>') +
+          '</section><section class="grid two"><article class="card"><h2>Requisição</h2><form id="playgroundForm">' +
+          (route.parameters || [])
+            .map(
+              (p, i) =>
+                '<label for="requestParam' +
+                i +
+                '">' +
+                esc(p.name) +
+                (p.required ? ' *' : '') +
+                ' (' +
+                esc(p.in) +
+                ')</label><input id="requestParam' +
+                i +
+                '" data-parameter="' +
+                esc(p.name) +
+                '" type="text" value="' +
+                esc(p.example === undefined ? '' : p.example) +
+                '" ' +
+                (p.required ? 'required' : '') +
+                '><p class="muted">' +
+                esc(p.description) +
+                '</p>',
+            )
+            .join('') +
+          (route.body
+            ? route.body.format === 'multipart'
+              ? '<p class="muted">Multipart: exemplo com avatar.png no campo file. O upload será liberado na migração.</p>'
+              : '<label for="requestBody">Corpo JSON</label><textarea id="requestBody" rows="8" spellcheck="false">' +
+                esc(helpers.bodyDefault(route) || '{}') +
+                '</textarea>'
+            : '<p class="muted">Sem corpo de requisição.</p>') +
+          '<div class="actions"><button class="button alt" type="button" id="buildSamples">Atualizar exemplos</button><button class="button" id="executeRequest" ' +
+          (!canRun ? 'disabled' : '') +
+          '>Executar leitura</button><button class="button alt" type="button" id="cancelRequest" hidden>Cancelar</button></div></form><h3>URL</h3><code id="requestUrl"></code></article><article class="card"><h2>Exemplos de código</h2><label for="sampleLanguage">Linguagem</label><select id="sampleLanguage"><option value="curl">cURL</option><option value="javascript">JavaScript</option><option value="typescript">TypeScript</option><option value="python">Python</option></select><pre class="code-panel"><code id="codeSample"></code></pre><button class="button alt" id="copySample">Copiar exemplo</button><h3>Resultado da execução</h3><p id="executionStatus" class="muted">Nenhuma requisição executada.</p><pre class="code-panel"><code id="executionOutput"></code></pre></article></section><article class="card"><h2>Contrato de resposta' +
+          (route.source === 'legacy' ? ' do legado' : '') +
+          '</h2><p class="muted">' +
+          esc(
+            route.documentation?.responseNote ||
+              'Formato documentado. Exemplos não são resultados de execução.',
+          ) +
+          '</p><ul>' +
+          (route.documentation?.fields || [])
+            .map(
+              (f) =>
+                '<li><code>' +
+                esc(f.name) +
+                '</code> — ' +
+                esc(f.description) +
+                '</li>',
+            )
+            .join('') +
+          '</ul>' +
+          (route.documentation?.notes || [])
+            .map((n) => '<p class="muted">' + esc(n) + '</p>')
+            .join('') +
+          '<pre class="code-panel"><code>' +
+          esc(
+            JSON.stringify(
+              route.documentation?.responseSchema || route.responses || [],
+              null,
+              2,
+            ),
+          ) +
+          '</code></pre><h3>Erros documentados</h3>' +
+          (route.errors || [])
+            .map(
+              (e) =>
+                '<p><code>' +
+                esc(e.status + ' ' + (e.code || '')) +
+                '</code> ' +
+                esc(e.description) +
+                '</p>',
+            )
+            .join('') +
+          '</article>',
+      );
+      document.querySelector('#playgroundRoute').onchange = (event) =>
+        (location.hash =
+          '#/playground?route=' + encodeURIComponent(event.target.value));
+      let samples;
+      let resolved;
+      let pending;
+      let controller;
+      const update = () => {
+        const values = Object.fromEntries(
+          [...document.querySelectorAll('[data-parameter]')].map((input) => [
+            input.dataset.parameter,
+            input.value,
+          ]),
+        );
+        const bodyText = document.querySelector('#requestBody')?.value || '';
+        helpers.validateRequest(route, values, bodyText);
+        resolved = helpers.resolvedPath(route, values);
+        samples = helpers.buildCodeSamples(route, {
+          baseUrl: location.origin,
+          parameters: values,
+          bodyText,
+        });
+        document.querySelector('#requestUrl').textContent =
+          location.origin + resolved;
+        document.querySelector('#codeSample').textContent =
+          samples[document.querySelector('#sampleLanguage').value];
+      };
+      const safeUpdate = () => {
+        try {
+          update();
+        } catch (error) {
+          notice(error.message, true);
+        }
+      };
+      document.querySelector('#buildSamples').onclick = safeUpdate;
+      document.querySelector('#sampleLanguage').onchange = safeUpdate;
+      document.querySelector('#copySample').onclick = async () => {
+        try {
+          update();
+          await navigator.clipboard.writeText(
+            document.querySelector('#codeSample').textContent,
+          );
+          notice('Exemplo copiado.');
+        } catch (error) {
+          notice(
+            error.message ||
+              'Não foi possível copiar. Selecione o código e copie manualmente.',
+            true,
+          );
+        }
+      };
+      const cancel = () => controller?.abort();
+      document.querySelector('#cancelRequest').onclick = cancel;
+      window.addEventListener('hashchange', cancel, { once: true });
+      document.querySelector('#playgroundForm').onsubmit = async (event) => {
+        event.preventDefault();
+        if (!canRun || pending) return;
+        try {
+          update();
+        } catch (error) {
+          notice(error.message, true);
+          return;
+        }
+        const target = new URL(resolved, location.origin);
+        if (
+          target.origin !== location.origin ||
+          !readablePaths.has(target.pathname)
+        ) {
+          notice('Destino inválido.', true);
+          return;
+        }
+        const execute = document.querySelector('#executeRequest');
+        const status = document.querySelector('#executionStatus');
+        const output = document.querySelector('#executionOutput');
+        const cancelButton = document.querySelector('#cancelRequest');
+        pending = true;
+        controller = new AbortController();
+        execute.disabled = true;
+        cancelButton.hidden = false;
+        output.textContent = '';
+        status.textContent = 'Consultando...';
+        const timer = setTimeout(() => controller.abort(), 30000);
+        const start = performance.now();
+        try {
+          const headers = { Accept: 'application/json' };
+          if (route.auth === 'session') {
+            const token = sessionStorage.getItem(keys.token);
+            if (!token) throw new Error('Sua sessão expirou. Entre novamente.');
+            headers.Authorization = 'Bearer ' + token;
+          }
+          const response = await fetch(target.href, {
+            method: 'GET',
+            headers,
+            signal: controller.signal,
+            redirect: 'error',
+            cache: 'no-store',
+          });
+          const reader = response.body?.getReader();
+          let size = 0;
+          const chunks = [];
+          if (!reader) throw new Error('Resposta vazia.');
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            size += value.byteLength;
+            if (size > 1048576) {
+              await reader.cancel();
+              throw new Error(
+                'Resposta excede 1 MiB. Reduza os parâmetros de paginação.',
+              );
+            }
+            chunks.push(value);
+          }
+          const bytes = new Uint8Array(size);
+          let offset = 0;
+          chunks.forEach((chunk) => {
+            bytes.set(chunk, offset);
+            offset += chunk.byteLength;
+          });
+          const text = new TextDecoder().decode(bytes);
+          let payload;
+          try {
+            payload = JSON.parse(text);
+          } catch {
+            payload = text;
+          }
+          output.textContent =
+            typeof payload === 'string'
+              ? payload
+              : JSON.stringify(payload, null, 2);
+          status.textContent =
+            'HTTP ' +
+            response.status +
+            ' · ' +
+            Math.round(performance.now() - start) +
+            ' ms · ' +
+            size +
+            ' bytes';
+          if (!response.ok || payload?.success === false)
+            notice(
+              'A API retornou um erro. Confira o resultado da execução.',
+              true,
+            );
+        } catch (error) {
+          status.textContent =
+            error.name === 'AbortError'
+              ? 'Requisição cancelada ou tempo limite atingido.'
+              : error.message;
+        } finally {
+          clearTimeout(timer);
+          pending = false;
+          execute.disabled = false;
+          cancelButton.hidden = true;
+        }
+      };
+      safeUpdate();
+    } catch (error) {
+      notice(error.message, true);
+    }
+  }
+
   async function logout() {
     try {
       await api('/auth/logout', { method: 'POST' });
@@ -1260,6 +1686,17 @@
     if (hash === '#/forgot') return forgotView();
 
     if (!(await requireUser())) {
+      if (hash === '#/catalog' || hash === '#/playground') {
+        const requestedRoute = params.get('route');
+        sessionStorage.setItem(
+          'krx.dashboard.return',
+          hash +
+            (hash === '#/playground' &&
+            /^[a-z0-9_-]{1,80}$/.test(requestedRoute || '')
+              ? '?route=' + requestedRoute
+              : ''),
+        );
+      }
       location.hash = '#/login';
       return loginView();
     }
@@ -1291,6 +1728,8 @@
       notice(message, failed);
       return;
     }
+    if (hash === '#/catalog') return catalogView();
+    if (hash === '#/playground') return playgroundView(params);
     if (hash === '#/billing') return billingView();
     if (hash === '#/payments') return paymentsView();
     if (hash === '#/billing-admin') return billingAdminView();

@@ -11,6 +11,10 @@
       {
         "include": "dashboard/public/**/*",
         "watchAssets": true
+      },
+      {
+        "include": "catalog/contracts/*.json",
+        "watchAssets": true
       }
     ]
   }
