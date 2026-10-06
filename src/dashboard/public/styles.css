@@ -90,3 +90,6 @@ textarea{width:100%;padding:12px;background:var(--bg);color:var(--text);border:1
 button:disabled{opacity:.5;cursor:not-allowed}
 #keyList,.table-wrap,#newKey{margin-top:20px}
 [hidden]{display:none!important}
+
+.check-field { display: flex; align-items: center; gap: .6rem; }
+.check-field input { width: auto; }

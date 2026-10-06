@@ -41,6 +41,8 @@ Ajustes exigem `delta` inteiro diferente de zero, `reason` com até 240 caracter
 
 Históricos retornam `{ "data": [], "hasNextPage": false, "page": 1 }`, com limite máximo de 50. Operações sem JWT retornam 401. Contas inativas e administradores sem a função atual no banco retornam 403. Recursos de outra conta não são expostos.
 
+A etapa seguinte de planos e pagamentos está documentada no [guia da segunda etapa](PLATFORM-PHASE-2.md).
+
 ## Integrações futuras
 
 `PlatformModule` exporta `ApiKeyGuard` e `PlatformService`. O guard aceita apenas o header `x-api-key` e define `request.apiIdentity = { userId, keyId }`. Chaves na URL/corpo não são aceitas.

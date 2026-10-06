@@ -25,6 +25,7 @@ import { MongooseConfigService } from './database/mongoose-config.service';
 import { DatabaseConfig } from './database/config/database-config.type';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PlatformModule } from './platform/platform.module';
+import { BillingModule } from './billing/billing.module';
 
 // <database-block>
 const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
@@ -89,7 +90,7 @@ const infrastructureDatabaseModule = (databaseConfig() as DatabaseConfig)
     DashboardModule,
     ...((databaseConfig() as DatabaseConfig).isDocumentDatabase
       ? []
-      : [PlatformModule]),
+      : [PlatformModule, BillingModule]),
   ],
 })
 export class AppModule {}
