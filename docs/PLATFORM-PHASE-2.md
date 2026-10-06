@@ -46,7 +46,7 @@ Aprovação, saldo, extrato, assinatura do plano e auditoria são gravados numa 
 
 Comprar o mesmo plano ativo estende a validade a partir do vencimento. Mudar de plano inicia a nova validade a partir da confirmação. Cada compra concede seu lote de créditos. Após o vencimento, os créditos restantes continuam disponíveis, mas os direitos voltam ao acesso gratuito. O limite de criação de chaves é aplicado imediatamente; chaves acima do limite depois de expirar um plano não são revogadas automaticamente. O usuário deve revogar chaves para criar novas.
 
-Categorias (`normal`, `freefire`, `consultas`) e `apiRateLimit` são contratos preparados para as futuras integrações. Esta etapa ainda não aplica rate limiting ou autorizações por categoria às rotas de serviços. Contas gratuitas seguem com limite de cinco chaves e saldo inicial zero.
+Categorias (`normal`, `freefire`, `consultas`) e `apiRateLimit` permanecem como metadata no backend e não são apresentados como funcionalidades disponíveis no editor de planos. Esta etapa ainda não aplica rate limiting ou autorizações por categoria às rotas de serviços. Contas gratuitas seguem com limite de cinco chaves e saldo inicial zero.
 
 ## Estornos e contestações
 

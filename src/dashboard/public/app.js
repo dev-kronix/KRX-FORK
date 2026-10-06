@@ -175,6 +175,31 @@
   }
 
   function setNav(authenticated) {
+    document.body.classList.toggle('guest', !authenticated);
+    if (authenticated) {
+      const titles = {
+        '#/': 'Visão geral',
+        '#/keys': 'Chaves de API',
+        '#/usage': 'Créditos e consumo',
+        '#/catalog': 'Endpoints',
+        '#/playground': 'Playground',
+        '#/billing': 'Planos e pagamentos',
+        '#/payments': 'Histórico de pagamentos',
+        '#/billing-admin': 'Administrar planos',
+        '#/billing-payments': 'Vendas',
+        '#/credits': 'Ajustes de créditos',
+        '#/users': 'Usuários',
+        '#/profile': 'Perfil e segurança',
+      };
+      document.querySelector('#workspaceTitle').textContent =
+        titles[location.hash.split('?')[0] || '#/'] || 'Workspace';
+      document.querySelector('#workspaceUser').textContent =
+        currentUser.email || nameOf(currentUser);
+      document.querySelector('#sidebarName').textContent = nameOf(currentUser);
+      document.querySelector('#sidebarAvatar').textContent = nameOf(currentUser)
+        .slice(0, 1)
+        .toUpperCase();
+    }
     document.querySelector('.topbar').style.display = authenticated
       ? 'flex'
       : 'none';
@@ -186,10 +211,11 @@
         authenticated && roleName(currentUser) === 'admin' ? '' : 'none';
     });
     nav?.querySelectorAll('a[href^="#/"]').forEach((a) => {
-      a.classList.toggle(
-        'active',
-        a.getAttribute('href') === location.hash.split('?')[0],
-      );
+      const active =
+        a.getAttribute('href') === (location.hash.split('?')[0] || '#/');
+      a.classList.toggle('active', active);
+      if (active) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
     });
   }
 
@@ -351,45 +377,38 @@
 
   async function dashboardView() {
     setNav(true);
-    const role = roleName(currentUser);
-    let summary;
+    app.innerHTML =
+      '<section class="loading-shell" aria-live="polite"><span class="loading-indicator"></span><h1>Carregando sua conta</h1><p>Consultando saldo e consumo.</p></section>';
     try {
-      summary = await api('/usage/summary');
+      const summary = await api('/usage/summary');
+      const number = (value) => new Intl.NumberFormat('pt-BR').format(value);
+      app.innerHTML =
+        '<section class="hero"><div class="hero-copy"><div class="eyebrow">SEU WORKSPACE</div><h1>Olá, ' +
+        esc(currentUser.firstName || 'dev') +
+        '.</h1><p>Suas credenciais, movimentações e ferramentas de desenvolvimento, em um só lugar.</p></div><div class="actions"><a class="button alt" href="#/keys">Gerenciar chaves</a><a class="button" href="#/playground">Abrir playground →</a></div></section>' +
+        '<section class="grid" aria-label="Resumo da conta"><article class="card metric"><span>Créditos disponíveis</span><strong>' +
+        esc(number(summary.balance)) +
+        '</strong><small>Saldo atual da sua conta</small></article><article class="card metric"><span>Requisições registradas</span><strong>' +
+        esc(number(summary.totalRequests)) +
+        '</strong><small>Histórico de consumo da API</small></article><article class="card metric"><span>Créditos consumidos</span><strong>' +
+        esc(number(summary.totalSpent)) +
+        '</strong><small>Total registrado no extrato</small></article></section>' +
+        '<div class="section-heading"><h2>Continue no workspace</h2><a href="#/catalog">Ver endpoints →</a></div><section class="grid two"><article class="card"><span class="step-label">DESENVOLVIMENTO</span><h2>Explore o que já funciona</h2><p class="muted">Consulte os endpoints implementados e execute leituras com a sua sessão. O resultado exibido vem da API.</p><div class="actions"><a class="button alt" href="#/catalog">Consultar endpoints</a><a class="button alt" href="/docs" target="_blank" rel="noopener noreferrer">Referência Swagger ↗</a></div></article><article class="card"><span class="step-label">CONTA E FATURAMENTO</span><h2>Seu saldo, sem mistério</h2><p class="muted">Confira o extrato de créditos e acompanhe o status das suas compras. Pagamentos aguardam confirmação do provedor.</p><div class="actions"><a class="button alt" href="#/usage">Ver movimentações</a><a class="button alt" href="#/billing">Planos e pagamentos</a></div></article></section>' +
+        '<section class="card"><div class="section-heading" style="margin-top:0"><h2>Sua conta</h2><a href="#/profile">Editar perfil →</a></div><p class="muted">' +
+        esc(nameOf(currentUser)) +
+        ' · ' +
+        esc(currentUser.email || 'E-mail não informado') +
+        '</p><span class="tag">' +
+        (roleName(currentUser) === 'admin' ? 'Administrador' : 'Usuário') +
+        '</span></section>' +
+        '<div class="quick-links"><a href="#/keys">Credenciais de acesso</a><a href="#/profile">Perfil e segurança</a><a href="#/payments">Histórico de pagamentos</a></div>';
     } catch (error) {
       app.innerHTML =
-        '<div class="notice error">' + esc(error.message) + '</div>';
-      return;
+        '<h1>Não foi possível carregar sua conta</h1><div class="notice error" role="alert">' +
+        esc(error.message) +
+        '</div><button class="button alt" id="retryDashboard">Tentar novamente</button>';
+      document.querySelector('#retryDashboard').onclick = dashboardView;
     }
-    app.innerHTML =
-      '<section class="hero"><div class="hero-copy"><div class="eyebrow">KRX / PAINEL</div>' +
-      '<h1>Olá, ' +
-      esc(currentUser.firstName || 'dev') +
-      '.</h1>' +
-      '<p>Seu acesso à KRX está centralizado aqui. Gerencie suas chaves, acompanhe créditos e consulte o histórico de consumo.</p></div>' +
-      '<span class="status">● API ONLINE</span></section>' +
-      '<section class="grid"><article class="card metric"><strong>' +
-      esc(summary.balance) +
-      '</strong><span>Créditos disponíveis</span></article>' +
-      '<article class="card metric"><strong>' +
-      esc(summary.totalRequests) +
-      '</strong><span>Requisições registradas</span></article>' +
-      '<article class="card metric"><strong>' +
-      esc(summary.totalSpent) +
-      '</strong><span>Créditos consumidos</span></article></section>' +
-      '<section class="grid two"><article class="card"><div class="eyebrow">01 / CONTA</div><h2>Identidade</h2>' +
-      '<p class="muted">' +
-      esc(nameOf(currentUser)) +
-      '<br>' +
-      esc(currentUser.email || 'Sem e-mail') +
-      '</p>' +
-      '<div class="actions"><a class="button alt" href="#/profile">Editar perfil</a></div></article>' +
-      '<article class="card"><div class="eyebrow">02 / API</div><h2>Ferramentas</h2><p class="muted">Acesse a documentação OpenAPI ou teste as rotas disponíveis.</p>' +
-      '<div class="actions"><a class="button" href="#/keys">Gerenciar chaves</a><a class="button alt" href="#/usage">Ver consumo</a></div></article></section>' +
-      '<div class="quick-links"><a href="/docs" target="_blank">Swagger</a><a href="/">Status da API</a>' +
-      (role === 'admin'
-        ? '<a href="#/users">Gerenciar usuários</a>'
-        : '<a href="#/profile">Minha conta</a>') +
-      '</div>';
   }
 
   async function usersView() {
@@ -1110,12 +1129,8 @@
         ['creditsPerCycle', 'Créditos por compra', 1, 100000000],
         ['billingPeriodDays', 'Validade em dias', 1, 366],
         ['maxActiveKeys', 'Máximo de chaves ativas', 1, 100],
-        ['apiRateLimit', 'Limite planejado por minuto', 1, 10000],
       ];
       const boolFields = [
-        ['normal', 'Categoria geral'],
-        ['freefire', 'Free Fire'],
-        ['consultas', 'Consultas'],
         ['active', 'Ativo'],
         ['public', 'Visível no catálogo'],
       ];
@@ -1137,7 +1152,7 @@
         },
       ) => {
         document.querySelector('#planEditor').innerHTML =
-          '<article class="card"><h2>Editar plano</h2><p class="muted">Mudanças valem para novas compras. Categorias e limite por minuto serão aplicados na migração das rotas.</p><form id="planForm"><label for="planId">Identificador</label><input id="planId" name="id" pattern="[a-z][a-z0-9-]{1,39}" value="' +
+          '<article class="card"><h2>Editar plano</h2><p class="muted">Mudanças valem para novas compras. Compras anteriores mantêm suas condições originais.</p><form id="planForm"><label for="planId">Identificador</label><input id="planId" name="id" pattern="[a-z][a-z0-9-]{1,39}" value="' +
           esc(p.id) +
           '" ' +
           (p.id ? 'readonly' : '') +
@@ -1188,6 +1203,10 @@
             id: form.elements.id.value,
             name: form.elements.name.value,
             description: form.elements.description.value,
+            apiRateLimit: p.apiRateLimit,
+            normal: p.normal,
+            freefire: p.freefire,
+            consultas: p.consultas,
           };
           numberFields.forEach(
             ([f]) => (dto[f] = Number(form.elements[f].value)),
@@ -1270,7 +1289,23 @@
     const response = await api(
       roleName(currentUser) === 'admin' ? '/admin/catalog' : '/catalog',
     );
-    return response.data;
+    const categories = response.data.categories
+      .map((c) => ({
+        ...c,
+        routes: c.routes.filter(
+          (r) =>
+            r.source === 'current' &&
+            r.executable === true &&
+            r.method === 'GET' &&
+            readablePaths.has(r.path),
+        ),
+      }))
+      .filter((c) => c.routes.length);
+    return {
+      ...response.data,
+      categories,
+      routeCount: categories.reduce((n, c) => n + c.routes.length, 0),
+    };
   }
   const searchText = (value) =>
     String(value)
@@ -1280,14 +1315,12 @@
   async function catalogView() {
     setNav(true);
     app.innerHTML =
-      '<div class="eyebrow">KRX / CATÁLOGO</div><h1>Contratos da API.</h1><div id="notice" hidden></div>';
+      '<div class="eyebrow">DESENVOLVIMENTO</div><h1>Endpoints disponíveis</h1><p class="muted">Leituras implementadas e disponíveis no playground. A referência completa da API está no Swagger.</p><div id="notice" role="status" hidden></div>';
     try {
       const catalog = await loadCatalog();
       app.insertAdjacentHTML(
         'beforeend',
-        '<p class="muted">' +
-          esc(catalog.routeCount) +
-          ' contratos visíveis. Integrações antigas aguardam migração; os contratos da plataforma atual estão disponíveis para leitura.</p><section class="card"><label for="catalogSearch">Buscar nome, rota ou descrição</label><input id="catalogSearch" type="search" placeholder="GPT, downloads, Free Fire..."><label for="catalogCategory">Categoria</label><select id="catalogCategory"><option value="">Todas</option>' +
+        '<section class="card endpoint-toolbar"><div><label for="catalogSearch">Buscar endpoint</label><input id="catalogSearch" type="search" placeholder="Nome, caminho ou descrição..."></div><div><label for="catalogCategory">Categoria</label><select id="catalogCategory"><option value="">Todas as categorias</option>' +
           catalog.categories
             .map(
               (c) =>
@@ -1295,12 +1328,10 @@
                 esc(c.id) +
                 '">' +
                 esc(c.name) +
-                ' (' +
-                c.routes.length +
-                ')</option>',
+                '</option>',
             )
             .join('') +
-          '</select></section><div id="catalogResults"></div>',
+          '</select></div></section><div class="section-heading"><span id="catalogCount" class="muted"></span><a href="/docs" target="_blank" rel="noopener noreferrer">Abrir Swagger ↗</a></div><div id="catalogResults"></div>',
       );
       const render = () => {
         const query = searchText(
@@ -1313,11 +1344,14 @@
             ...c,
             routes: c.routes.filter((r) =>
               searchText(
-                r.name + ' ' + r.path + ' ' + r.summary + ' ' + c.name,
+                r.name + ' ' + r.path + ' ' + r.description + ' ' + c.name,
               ).includes(query),
             ),
           }))
           .filter((c) => c.routes.length);
+        const count = visible.reduce((n, c) => n + c.routes.length, 0);
+        document.querySelector('#catalogCount').textContent =
+          count + ' endpoint(s) encontrado(s)';
         document.querySelector('#catalogResults').innerHTML =
           visible
             .map(
@@ -1326,33 +1360,29 @@
                 esc(c.name) +
                 '</h2><p class="muted">' +
                 esc(c.description) +
-                '</p><div class="grid two">' +
+                '</p><div class="table-wrap">' +
                 c.routes
                   .map(
                     (r) =>
-                      '<article class="card"><span class="eyebrow">' +
+                      '<article class="endpoint-row"><span class="method-badge">' +
                       esc(r.method) +
-                      ' · ' +
-                      esc(authLabel[r.auth]) +
-                      '</span><h3>' +
+                      '</span><div><h3>' +
                       esc(r.name) +
                       '</h3><code>' +
                       esc(r.path) +
                       '</code><p>' +
-                      esc(r.summary) +
-                      '</p><p class="muted">' +
-                      (r.executable
-                        ? 'Disponível · '
-                        : 'Aguardando migração · Custo do legado: ') +
-                      esc(r.credits) +
-                      ' crédito(s)</p><a class="button alt" href="#/playground?route=' +
+                      esc(r.description) +
+                      '</p></div><div class="endpoint-meta"><span>' +
+                      esc(authLabel[r.auth]) +
+                      '</span><a class="button alt" href="#/playground?route=' +
                       encodeURIComponent(r.id) +
-                      '">Abrir playground</a></article>',
+                      '">Testar →</a></div></article>',
                   )
                   .join('') +
                 '</div></section>',
             )
-            .join('') || '<p class="muted">Nenhum contrato encontrado.</p>';
+            .join('') ||
+          '<div class="empty-state"><strong>Nenhum endpoint encontrado</strong><p>Tente outro termo ou selecione todas as categorias.</p></div>';
       };
       document
         .querySelector('#catalogSearch')
@@ -1365,10 +1395,11 @@
       notice(error.message, true);
     }
   }
+
   async function playgroundView(params) {
     setNav(true);
     app.innerHTML =
-      '<div class="eyebrow">KRX / PLAYGROUND</div><h1>Monte sua requisição.</h1><div id="notice" hidden></div>';
+      '<div class="eyebrow">DESENVOLVIMENTO</div><h1>Playground</h1><p class="muted">Execute uma leitura real e inspecione o resultado. Nenhuma chamada é feita antes de clicar em Executar.</p><div id="notice" role="status" hidden></div>';
     try {
       const catalog = await loadCatalog();
       const routes = catalog.categories.flatMap((c) =>
@@ -1377,7 +1408,10 @@
       const selected = params.get('route') || 'current-usage';
       const route = routes.find((r) => r.id === selected);
       if (!route) {
-        notice('Contrato não encontrado ou indisponível para sua conta.', true);
+        notice(
+          'Endpoint não encontrado. Ele pode ter sido removido. Consulte a lista de endpoints disponíveis.',
+          true,
+        );
         return;
       }
       const helpers = window.KrxPlayground;
@@ -1388,7 +1422,7 @@
         readablePaths.has(route.path);
       app.insertAdjacentHTML(
         'beforeend',
-        '<section class="card"><label for="playgroundRoute">Contrato</label><select id="playgroundRoute">' +
+        '<section class="card"><label for="playgroundRoute">Endpoint</label><select id="playgroundRoute">' +
           catalog.categories
             .map(
               (c) =>
@@ -1421,12 +1455,10 @@
           ' · ' +
           esc(route.credits) +
           ' crédito(s)' +
-          (canRun
-            ? ' · Leitura disponível'
-            : ' · Contrato legado, aguardando migração') +
+          (canRun ? ' · Leitura disponível' : ' · Execução indisponível') +
           '</p>' +
           (!canRun
-            ? '<p class="notice">A execução deste contrato será liberada após a migração da integração. Os exemplos abaixo servem para preparar seu código.</p>'
+            ? '<p class="notice">Este endpoint não está disponível para execução. Escolha outro endpoint.</p>'
             : '<p class="notice">Usa a sessão desta conta. Os exemplos copiados contêm apenas placeholders de credenciais.</p>') +
           '</section><section class="grid two"><article class="card"><h2>Requisição</h2><form id="playgroundForm">' +
           (route.parameters || [])
@@ -1461,7 +1493,7 @@
             : '<p class="muted">Sem corpo de requisição.</p>') +
           '<div class="actions"><button class="button alt" type="button" id="buildSamples">Atualizar exemplos</button><button class="button" id="executeRequest" ' +
           (!canRun ? 'disabled' : '') +
-          '>Executar leitura</button><button class="button alt" type="button" id="cancelRequest" hidden>Cancelar</button></div></form><h3>URL</h3><code id="requestUrl"></code></article><article class="card"><h2>Exemplos de código</h2><label for="sampleLanguage">Linguagem</label><select id="sampleLanguage"><option value="curl">cURL</option><option value="javascript">JavaScript</option><option value="typescript">TypeScript</option><option value="python">Python</option></select><pre class="code-panel"><code id="codeSample"></code></pre><button class="button alt" id="copySample">Copiar exemplo</button><h3>Resultado da execução</h3><p id="executionStatus" class="muted">Nenhuma requisição executada.</p><pre class="code-panel"><code id="executionOutput"></code></pre></article></section><article class="card"><h2>Contrato de resposta' +
+          '>Executar leitura</button><button class="button alt" type="button" id="cancelRequest" hidden>Cancelar</button></div></form><h3>URL</h3><code id="requestUrl"></code></article><article class="card"><h2>Exemplos de código</h2><label for="sampleLanguage">Linguagem</label><select id="sampleLanguage"><option value="curl">cURL</option><option value="javascript">JavaScript</option><option value="typescript">TypeScript</option><option value="python">Python</option></select><pre class="code-panel"><code id="codeSample"></code></pre><button class="button alt" id="copySample">Copiar exemplo</button><h3>Resultado da execução</h3><p id="executionStatus" class="muted">Nenhuma requisição executada.</p><pre class="code-panel"><code id="executionOutput"></code></pre></article></section><article class="card"><h2>Documentação da resposta' +
           (route.source === 'legacy' ? ' do legado' : '') +
           '</h2><p class="muted">' +
           esc(
@@ -1676,6 +1708,7 @@
 
   async function route() {
     nav?.classList.remove('open');
+    menuButton?.setAttribute('aria-expanded', 'false');
     const [hash, query = ''] = (location.hash || '#/').split('?');
     const params = new URLSearchParams(query);
     if (hash === '#/confirm-email' || hash === '#/confirm-new-email')
@@ -1742,8 +1775,21 @@
     return dashboardView();
   }
 
-  menuButton?.addEventListener('click', () => nav?.classList.toggle('open'));
+  menuButton?.addEventListener('click', () => {
+    const open = nav?.classList.toggle('open');
+    menuButton.setAttribute('aria-expanded', String(Boolean(open)));
+  });
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      nav?.classList.remove('open');
+      menuButton?.setAttribute('aria-expanded', 'false');
+    }
+  });
   logoutButton?.addEventListener('click', logout);
+  document.querySelector('.skip-link')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    app.focus();
+  });
   window.addEventListener('hashchange', () => {
     routeQueue = routeQueue.then(route, route);
   });

@@ -30,6 +30,6 @@ export class AdminCatalogController {
     @Request() req: RequestWithUser<JwtPayloadType>,
   ) {
     await this.platform.activeUser(Number(req.user.id), undefined, true);
-    return this.catalog.catalog(true);
+    return this.catalog.catalog();
   }
 }

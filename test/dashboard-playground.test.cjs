@@ -4,12 +4,44 @@ const { readFileSync } = require('node:fs');
 const { spawnSync } = require('node:child_process');
 const { JSDOM } = require('jsdom');
 const helpers = require('../src/dashboard/public/playground.js');
-const legacy = JSON.parse(
-  readFileSync('src/catalog/contracts/legacy.json', 'utf8'),
-);
-const gpt = legacy.categories
-  .flatMap((c) => c.routes)
-  .find((r) => r.id === 'ias-gpt');
+// Fixtures exercise blocked/invalid inputs; none are published in the product catalog.
+const gpt = {
+  id: 'blocked-route',
+  name: 'Unavailable fixture',
+  method: 'GET',
+  path: '/api/v1/unavailable',
+  auth: 'apiKey',
+  credits: 0,
+  contentType: 'application/json',
+  parameters: [
+    {
+      name: 'query',
+      in: 'query',
+      required: true,
+      type: 'string',
+      example: 'Test',
+    },
+  ],
+  documentation: { resultPath: 'data.resposta' },
+};
+const legacy = {
+  categories: [
+    {
+      routes: [
+        gpt,
+        {
+          ...gpt,
+          id: 'upload',
+          method: 'POST',
+          parameters: [],
+          body: { format: 'multipart' },
+        },
+        { ...gpt, id: 'binary', contentType: 'image/png' },
+        { ...gpt, id: 'blocked_with_underscore' },
+      ],
+    },
+  ],
+};
 const user = { id: 2, firstName: 'Dev', role: { id: 2, name: 'user' } };
 const current = {
   id: 'current-usage',
@@ -138,7 +170,7 @@ test('multipart and binary examples preserve upload boundaries and download hand
     /response.arrayBuffer/,
   );
 });
-test('all restored default code samples are syntactically valid JavaScript and Python', () => {
+test('request sample fixtures are syntactically valid JavaScript and Python', () => {
   const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
   const python = [];
   for (const route of [
@@ -160,23 +192,16 @@ test('all restored default code samples are syntactically valid JavaScript and P
   );
   assert.equal(result.status, 0, result.stderr);
 });
-test('legacy selection builds examples and cannot execute even through a synthetic submit', async () => {
-  const ui = await setup('#/playground?route=ias-gpt');
+test('removed contracts are hidden even when received from an outdated catalog', async () => {
+  const ui = await setup('#/playground?route=blocked-route');
   try {
-    await until(() => ui.document.querySelector('#executeRequest'));
-    assert(ui.document.querySelector('#executeRequest').disabled);
-    submit(ui);
-    await tick();
-    assert(!ui.calls.some((c) => c.url.includes('/ias/gpt')));
-    assert.match(
-      ui.document.querySelector('#codeSample').textContent,
-      /SUA_CHAVE_KRX/,
+    await until(() =>
+      ui.document
+        .querySelector('#notice')
+        ?.textContent.includes('não encontrado'),
     );
-    assert(
-      !ui.document
-        .querySelector('#codeSample')
-        .textContent.includes('REAL_SECRET_SESSION'),
-    );
+    assert.equal(ui.document.querySelector('#executeRequest'), null);
+    assert(!ui.calls.some((c) => c.url.includes('/unavailable')));
   } finally {
     ui.dom.window.close();
   }
@@ -245,9 +270,12 @@ test('public reads omit JWT and unknown or modified destinations cannot run', as
     [{ ...current, path: 'https://evil.test/secret' }],
   );
   try {
-    await until(() => blocked.document.querySelector('#executeRequest'));
-    assert(blocked.document.querySelector('#executeRequest').disabled);
-    submit(blocked);
+    await until(() =>
+      blocked.document
+        .querySelector('#notice')
+        ?.textContent.includes('não encontrado'),
+    );
+    assert.equal(blocked.document.querySelector('#executeRequest'), null);
     await tick();
     assert(!blocked.calls.some((c) => c.url.startsWith('https://')));
   } finally {
@@ -287,7 +315,7 @@ test('category search filters contracts and handles a missing selection', async 
   try {
     await until(() => ui.document.querySelector('#catalogSearch'));
     const input = ui.document.querySelector('#catalogSearch');
-    input.value = 'GPT';
+    input.value = 'Saldo';
     input.dispatchEvent(new ui.dom.window.Event('input'));
     assert.equal(
       ui.document.querySelectorAll('#catalogResults article').length,
@@ -315,11 +343,9 @@ test('category search filters contracts and handles a missing selection', async 
   }
 });
 
-test('login restores deep links including legacy contract IDs with underscores', async () => {
-  for (const routeId of ['ias-gpt', 'stickers-figu_anime']) {
-    const legacyRoute = legacy.categories
-      .flatMap((c) => c.routes)
-      .find((r) => r.id === routeId);
+test('login restores an existing endpoint selected before authenticating', async () => {
+  for (const routeId of ['current-usage', 'current_ledger']) {
+    const selectedRoute = { ...current, id: routeId };
     const ui = await setup(
       '#/playground?route=' + routeId,
       (url) => {
@@ -332,7 +358,7 @@ test('login restores deep links including legacy contract IDs with underscores',
           }),
         );
       },
-      [current, { ...legacyRoute, source: 'legacy', executable: false }],
+      [selectedRoute],
       false,
     );
     try {
@@ -384,6 +410,52 @@ test('running read can be cancelled without enabling legacy execution', async ()
         .textContent.includes('cancelada'),
     );
     assert.equal(ui.document.querySelector('#executeRequest').disabled, false);
+  } finally {
+    ui.dom.window.close();
+  }
+});
+
+test('workspace uses real metrics, highlights navigation and keeps admin controls hidden for ordinary users', async () => {
+  const ui = await setup('#/', (url) => {
+    assert(url.endsWith('/usage/summary'));
+    return new Response(
+      JSON.stringify({ balance: 42, totalRequests: 3, totalSpent: 7 }),
+    );
+  });
+  try {
+    await until(() => ui.document.querySelector('.metric'));
+    assert.deepEqual(
+      [...ui.document.querySelectorAll('.metric strong')].map(
+        (x) => x.textContent,
+      ),
+      ['42', '3', '7'],
+    );
+    assert(
+      !ui.document.querySelector('#app').textContent.includes('API ONLINE'),
+    );
+    assert.equal(
+      ui.document
+        .querySelector('a[href="#/"][aria-current="page"]')
+        .textContent.trim(),
+      'Visão geral',
+    );
+    assert.equal(
+      ui.document.querySelector('[data-admin]').style.display,
+      'none',
+    );
+    assert.equal(ui.document.body.classList.contains('guest'), false);
+    ui.document.querySelector('#menuButton').click();
+    assert.equal(
+      ui.document.querySelector('#menuButton').getAttribute('aria-expanded'),
+      'true',
+    );
+    ui.dom.window.dispatchEvent(
+      new ui.dom.window.KeyboardEvent('keydown', { key: 'Escape' }),
+    );
+    assert.equal(
+      ui.document.querySelector('#menuButton').getAttribute('aria-expanded'),
+      'false',
+    );
   } finally {
     ui.dom.window.close();
   }

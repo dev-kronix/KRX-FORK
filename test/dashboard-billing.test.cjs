@@ -145,6 +145,10 @@ test('admin editor sends typed fields and preserves disabled sales unless select
     assert.equal(saved.active, false);
     assert.equal(saved.public, false);
     assert.equal(saved.id, 'starter');
+    assert.equal(saved.apiRateLimit, plan.apiRateLimit);
+    assert.equal(saved.freefire, plan.freefire);
+    assert.equal(form.elements.namedItem('freefire'), null);
+    assert.equal(form.elements.namedItem('apiRateLimit'), null);
   } finally {
     ui.dom.window.close();
   }
