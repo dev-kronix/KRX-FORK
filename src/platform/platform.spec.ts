@@ -103,7 +103,7 @@ describe('Platform foundation (PostgreSQL)', () => {
     ...overrides,
   });
 
-  it('requires JWT and returns zero initial balance', async () => {
+  it('should requires JWT and returns zero initial balance', async () => {
     await request(app.getHttpServer()).get('/api/v1/usage/summary').expect(401);
     const response = await request(app.getHttpServer())
       .get('/api/v1/usage/summary')
@@ -116,7 +116,7 @@ describe('Platform foundation (PostgreSQL)', () => {
       failedRequests: 0,
     });
   });
-  it('creates a key once, stores only the hash, and isolates owners', async () => {
+  it('should creates a key once, stores only the hash, and isolates owners', async () => {
     const response = await request(app.getHttpServer())
       .post('/api/v1/keys')
       .auth(token(), { type: 'bearer' })
@@ -139,7 +139,7 @@ describe('Platform foundation (PostgreSQL)', () => {
       .expect(404);
     expect(await service.listKeys(3)).toEqual([]);
   });
-  it('enforces five active keys under simultaneous creation', async () => {
+  it('should enforces five active keys under simultaneous creation', async () => {
     const result = await Promise.allSettled(
       Array.from({ length: 8 }, (_, i) => service.createKey(2, 'Bot ' + i)),
     );
@@ -148,7 +148,7 @@ describe('Platform foundation (PostgreSQL)', () => {
       (await service.listKeys(2)).filter((k) => k.status === 'active'),
     ).toHaveLength(5);
   });
-  it('revocation is idempotent, blocks authentication, and frees a slot', async () => {
+  it('should revocation is idempotent, blocks authentication, and frees a slot', async () => {
     const key = await service.createKey(2, 'Bot');
     expect(await service.authenticateKey(key.key)).toEqual({
       userId: 2,
@@ -164,7 +164,7 @@ describe('Platform foundation (PostgreSQL)', () => {
       'active',
     );
   });
-  it('validates key names, pagination and IDs at HTTP boundaries', async () => {
+  it('should validates key names, pagination and IDs at HTTP boundaries', async () => {
     await request(app.getHttpServer())
       .post('/api/v1/keys')
       .auth(token(), { type: 'bearer' })
@@ -179,7 +179,7 @@ describe('Platform foundation (PostgreSQL)', () => {
       .auth(token(), { type: 'bearer' })
       .expect(400);
   });
-  it('only active current admins can adjust; stale admin JWTs cannot', async () => {
+  it('should only active current admins can adjust; stale admin JWTs cannot', async () => {
     const payload = { delta: 5, reason: 'Inicial', requestId: randomUUID() };
     await request(app.getHttpServer())
       .post('/api/v1/admin/credits/2/adjustments')
@@ -198,7 +198,7 @@ describe('Platform foundation (PostgreSQL)', () => {
       .send({ ...payload, requestId: randomUUID() })
       .expect(403);
   });
-  it('adjustments are auditable and idempotent; changed retries conflict', async () => {
+  it('should adjustments are auditable and idempotent; changed retries conflict', async () => {
     const id = randomUUID();
     await grant(10, id);
     await grant(10, id);
@@ -211,7 +211,7 @@ describe('Platform foundation (PostgreSQL)', () => {
       (await service.history(3, { page: 1, limit: 20 }, true)).data,
     ).toEqual([]);
   });
-  it('rejects zero, fractional, overflow and overdraft adjustments', async () => {
+  it('should rejects zero, fractional, overflow and overdraft adjustments', async () => {
     await expect(grant(-1)).rejects.toMatchObject({ status: 400 });
     const url = '/api/v1/admin/credits/2/adjustments';
     for (const delta of [0, 1.5, 2147483648])
@@ -223,7 +223,7 @@ describe('Platform foundation (PostgreSQL)', () => {
     await grant(2147483647);
     await expect(grant(1)).rejects.toMatchObject({ status: 400 });
   });
-  it('charges success exactly once and records failed requests without charge', async () => {
+  it('should charges success exactly once and records failed requests without charge', async () => {
     await grant();
     const key = await service.createKey(2, 'Bot');
     const usage = input(key.record.id);
@@ -240,7 +240,7 @@ describe('Platform foundation (PostgreSQL)', () => {
       service.recordUsage({ ...usage, cost: 5 }),
     ).rejects.toMatchObject({ status: 409 });
   });
-  it('concurrent charges cannot overdraw and rejected charges leave no history', async () => {
+  it('should concurrent charges cannot overdraw and rejected charges leave no history', async () => {
     await grant(10);
     const key = await service.createKey(2, 'Bot');
     const results = await Promise.allSettled(
@@ -258,7 +258,7 @@ describe('Platform foundation (PostgreSQL)', () => {
       (await service.history(2, { page: 1, limit: 20 }, true)).data,
     ).toHaveLength(3);
   });
-  it('never mixes key owners or reuses adjustment IDs for consumption', async () => {
+  it('should never mixes key owners or reuses adjustment IDs for consumption', async () => {
     await grant();
     const key = await service.createKey(2, 'Bot');
     await expect(
@@ -275,7 +275,7 @@ describe('Platform foundation (PostgreSQL)', () => {
       status: 409,
     });
   });
-  it('inactive/deleted users cannot manage keys or authenticate existing keys', async () => {
+  it('should inactive/deleted users cannot manage keys or authenticate existing keys', async () => {
     const key = await service.createKey(2, 'Bot');
     await pg.exec('UPDATE "user" SET "statusId" = 2 WHERE "id" = 2');
     await expect(service.authenticateKey(key.key)).rejects.toMatchObject({
@@ -293,7 +293,7 @@ describe('Platform foundation (PostgreSQL)', () => {
       status: 401,
     });
   });
-  it('paginates histories and rejects logging secrets in query strings', async () => {
+  it('should paginates histories and rejects logging secrets in query strings', async () => {
     await grant();
     const key = await service.createKey(2, 'Bot');
     for (let i = 0; i < 3; i++)
@@ -311,7 +311,7 @@ describe('Platform foundation (PostgreSQL)', () => {
       ),
     ).rejects.toMatchObject({ status: 400 });
   });
-  it('rolls back the balance if a later insert fails', async () => {
+  it('should rolls back the balance if a later insert fails', async () => {
     await grant();
     const key = await service.createKey(2, 'Bot');
     await pg.exec(`CREATE FUNCTION reject_test_usage() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test insert failure'; END; $$;
