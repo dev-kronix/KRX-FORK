@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#080b08">
+  <meta name="description" content="Dashboard oficial da KRX API">
+  <title>KRX Dashboard</title>
+  <link rel="stylesheet" href="/dashboard/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/dashboard/">
+      <span class="brand-mark">K</span>
+      <span>KRX</span>
+      <small>API</small>
+    </a>
+    <button class="menu-button" id="menuButton" type="button" aria-label="Abrir menu">☰</button>
+    <nav id="nav">
+      <a href="#/">Painel</a>
+      <a href="#/users" data-admin>Usuários</a>
+      <a href="#/profile">Perfil</a>
+      <a href="/docs" target="_blank">Docs ↗</a>
+      <button type="button" class="nav-logout" id="logoutButton">Sair</button>
+    </nav>
+  </header>
+
+  <main id="app">
+    <section class="loading-shell">
+      <div class="eyebrow">KRX / DASHBOARD</div>
+      <h1>Carregando.</h1>
+    </section>
+  </main>
+
+  <footer>
+    <span>KRX API</span>
+    <span>krxdev.tech</span>
+  </footer>
+
+  <script src="/dashboard/app.js" defer></script>
+</body>
+</html>
