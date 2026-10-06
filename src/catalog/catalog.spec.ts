@@ -1,6 +1,18 @@
+jest.mock('../database/config/database.config', () => ({
+  __esModule: true,
+  default: () => ({ isDocumentDatabase: false }),
+}));
+import { PATH_METADATA, METHOD_METADATA } from '@nestjs/common/constants';
+import { AuthController } from '../auth/auth.controller';
+import {
+  ApiKeysController,
+  UsageController,
+} from '../platform/platform.controller';
+import { BillingController } from '../billing/billing.controller';
 import {
   ForbiddenException,
   INestApplication,
+  RequestMethod,
   VersioningType,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -15,7 +27,7 @@ import {
 } from './catalog.controller';
 import { PlatformService } from '../platform/platform.service';
 import { JwtStrategy } from '../auth/strategies/jwt.strategy';
-describe('Recovered catalog', () => {
+describe('Implemented catalog', () => {
   const service = new CatalogService();
   const jwt = new JwtService({ secret: 'catalog-test-secret' });
   const platform = { activeUser: jest.fn() };
@@ -47,39 +59,64 @@ describe('Recovered catalog', () => {
   afterAll(async () => {
     await app?.close();
   });
-  it('should preserve all 219 legacy contracts across 19 categories and mark every one planned', () => {
-    const data = service.catalog(true).data;
-    expect(data.legacyTotal).toBe(219);
-    expect(data.categories).toHaveLength(20);
-    expect(data.routeCount).toBe(227);
-    const legacy = data.categories.slice(1).flatMap((c) => c.routes);
-    expect(new Set(legacy.map((r) => r.id)).size).toBe(219);
-    for (const r of legacy) {
-      expect(r).toMatchObject({
-        source: 'legacy',
-        status: 'planned',
-        executable: false,
-        active: false,
-      });
-      expect(r.legacyStatus).toBeDefined();
-    }
+  it('should expose exactly eight existing read endpoints in three groups', () => {
+    const data = service.catalog().data;
+    expect(data.routeCount).toBe(8);
+    expect(data.categories).toHaveLength(3);
+    const routes = data.categories.flatMap((c) => c.routes);
+    expect(new Set(routes.map((r) => r.id)).size).toBe(8);
+    expect(
+      routes.every(
+        (r) => r.source === 'current' && r.executable && r.method === 'GET',
+      ),
+    ).toBe(true);
+    expect(data).not.toHaveProperty('legacyTotal');
+    expect(data).not.toHaveProperty('sourceArchive');
+    expect(routes.some((r) => /ias|consultas|scraper/.test(r.path))).toBe(
+      false,
+    );
   });
-  it('should preserve GPT inputs, cost and result schema instead of inventing responses', () => {
-    const gpt = service
+  it('should publish only GET paths actually declared by current controllers', () => {
+    const registered = new Set<string>();
+    for (const controller of [
+      AuthController,
+      ApiKeysController,
+      UsageController,
+      BillingController,
+    ]) {
+      const base = Reflect.getMetadata(PATH_METADATA, controller);
+      for (const name of Object.getOwnPropertyNames(controller.prototype)) {
+        const method = (
+          controller.prototype as unknown as Record<string, unknown>
+        )[name];
+        if (
+          typeof method !== 'function' ||
+          Reflect.getMetadata(METHOD_METADATA, method) !== RequestMethod.GET
+        )
+          continue;
+        const path = Reflect.getMetadata(PATH_METADATA, method);
+        registered.add(
+          ('/api/v1/' + base + '/' + path)
+            .replace(/\/+/g, '/')
+            .replace(/\/$/, ''),
+        );
+      }
+    }
+    for (const route of service
+      .catalog()
+      .data.categories.flatMap((c) => c.routes))
+      expect(registered.has(route.path)).toBe(true);
+  });
+  it('should preserve real pagination parameters', () => {
+    const recent = service
       .catalog()
       .data.categories.flatMap((c) => c.routes)
-      .find((r) => r.id === 'ias-gpt')!;
-    expect(gpt.path).toBe('/api/v1/ias/gpt');
-    expect(gpt.credits).toBe(3);
-    expect(gpt.parameters[0]).toMatchObject({
-      name: 'query',
-      in: 'query',
-      required: true,
-    });
-    expect(gpt.documentation.resultPath).toBe('data.resposta');
-    expect(
-      gpt.documentation.responseSchema.properties.data.properties.resposta.type,
-    ).toBe('string');
+      .find((r) => r.id === 'current-recent')!;
+    expect(recent.path).toBe('/api/v1/usage/recent');
+    expect(recent.parameters.map((p: any) => p.name)).toEqual([
+      'page',
+      'limit',
+    ]);
   });
   it('should omit administrative contracts publicly and expose only eight current read operations', async () => {
     const response = await request(app.getHttpServer())

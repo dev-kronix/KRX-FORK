@@ -1,74 +1,46 @@
-# Etapa 3: catálogo e playground
+# Catálogo e playground: somente endpoints implementados
 
-Recupera os contratos do arquivo `KRX-API-v0.15.8.zip`, sem montar as rotas de serviços. Pagamentos continuam configurados conforme a [etapa 2](PLATFORM-PHASE-2.md).
+O catálogo antigo foi removido da aplicação. Não há entradas planejadas, demonstrações de serviços, preços de integrações inexistentes ou contadores de rotas futuras. Os arquivos antigos enviados continuam sendo referência para trabalho posterior, sem fazer parte do build.
 
-## Uso
+## O que existe hoje no playground
 
-- Catálogo: `/dashboard/#/catalog`.
-- Playground: `/dashboard/#/playground`.
-- Link direto de contrato: `/dashboard/#/playground?route=ias-gpt`.
-- Sem sessão, o dashboard solicita login e retorna ao contrato selecionado depois de autenticar, inclusive pelo Google.
-- Busque por nome, caminho, descrição ou categoria. Os contratos administrativos antigos só aparecem para administradores.
-- Preencha parâmetros e corpo JSON, escolha cURL, JavaScript, TypeScript ou Python e copie o exemplo. Exemplos usam o domínio em que o dashboard está aberto e placeholders de credenciais.
-- Contratos antigos indicam **aguardando migração**, com execução bloqueada. Custos, requisitos e formatos exibidos são os do legado; não representam serviços já disponíveis na nova API.
-- Leituras da plataforma atual podem ser executadas com a própria sessão. Requisições públicas não recebem JWT. Resultado da execução e contrato documentado aparecem em áreas separadas.
-
-## Inventário recuperado
-
-São 219 contratos em 19 categorias no arquivo de catálogo antigo. Esse número vem dos JSONs de categorias, não da contagem de caminhos no OpenAPI antigo: um mesmo caminho pode representar várias operações e o documento também utiliza uma representação diferente para parâmetros de caminho.
-
-| Categoria | Contratos |
-| --- | ---: |
-| Sistema | 5 |
-| Acesso | 8 |
-| Chaves | 3 |
-| Consumo | 2 |
-| Portal | 4 |
-| Downloads | 25 |
-| Free Fire | 5 |
-| Uploads | 1 |
-| Pesquisas | 10 |
-| Consultas | 37 |
-| Outros | 16 |
-| IAs | 6 |
-| Logos | 53 |
-| Notícias | 7 |
-| Stickers | 13 |
-| Canvas | 12 |
-| Geradores | 2 |
-| Animes | 2 |
-| Scraper Labs | 8 |
-
-O arquivo `src/catalog/contracts/legacy.json` conserva identificadores, métodos, caminhos, autenticação, parâmetros, corpos, respostas, schemas, erros e documentação. Inclui o SHA-256 do ZIP de origem. Uma observação foi acrescentada ao contrato de revelar chave, explicando a mudança abaixo. Nenhum `.env`, segredo, usuário ou transação do ZIP foi importado.
-
-O catálogo público exibe 197 contratos antigos mais oito leituras atuais, totalizando 205 entradas em 16 categorias. Para administrador são 219 contratos antigos mais oito atuais, totalizando 227 entradas em 20 categorias. Categorias administrativas vazias são omitidas da versão pública.
-
-## Endpoints do catálogo
-
-| Método e caminho | Acesso | Resultado |
+| Grupo | Endpoint GET | Função |
 | --- | --- | --- |
-| `GET /api/v1/catalog` | Público | Envelope `{success,status,data}` com categorias e contratos públicos |
-| `GET /api/v1/admin/catalog` | JWT de administrador ativo | Todos os contratos, com papel e estado conferidos no banco |
+| Conta e chaves | `/api/v1/auth/me` | Dados da conta autenticada |
+| Conta e chaves | `/api/v1/keys` | Chaves e estados, sem revelar a chave completa |
+| Créditos e consumo | `/api/v1/usage/summary` | Saldo, requisições e créditos consumidos |
+| Créditos e consumo | `/api/v1/usage/recent` | Histórico paginado de requisições |
+| Créditos e consumo | `/api/v1/usage/ledger` | Extrato paginado de créditos |
+| Planos e pagamentos | `/api/v1/billing/plans` | Planos publicados e disponibilidade do checkout |
+| Planos e pagamentos | `/api/v1/billing/subscription` | Plano, validade e estado da conta |
+| Planos e pagamentos | `/api/v1/billing/payments` | Histórico paginado de compras |
 
-Cada contrato antigo recebe `source=legacy`, `legacyStatus` preservado, `status=planned`, `active=false` e `executable=false`. Os contratos atuais têm `source=current` e `executable=true`. O JSON de contratos é incluído no build pelo `nest-cli.json`; não requer nova migração nem variável de ambiente.
+São oito leituras disponibilizadas no playground, não o número total de rotas da API. Autenticação, criação/revogação de chaves, checkout, webhooks e administração continuam existindo e estão documentados no Swagger. Operações de escrita não são executadas pelo playground.
 
-## Leituras executáveis
+`GET /api/v1/catalog` fornece as oito entradas em três grupos. O endpoint administrativo existente `/api/v1/admin/catalog` permanece protegido por JWT e administrador ativo, mas fornece as mesmas leituras. Nenhuma API de serviço antigo é registrada ou simulada.
 
-São GET de conta (`auth/me`), chaves (`keys`), saldo (`usage/summary`), requisições (`usage/recent`), extrato (`usage/ledger`), planos (`billing/plans`), assinatura (`billing/subscription`) e pagamentos (`billing/payments`). Todas usam `/api/v1/`.
+## Dashboard
 
-A interface admite somente esses caminhos no mesmo domínio, sem redirecionamentos, sem escrita e sem proxy para provedores. Cada endpoint continua validando sua própria autenticação/propriedade. A leitura pode ser cancelada, tem timeout de 30 segundos e limite de resposta de 1 MiB. Erros HTTP, falhas lógicas (`success=false`) e texto não JSON aparecem como resultado real, sem execução de HTML recebido.
+- `/dashboard/#/`: métricas reais de saldo e consumo, atalhos e identidade da conta.
+- `/dashboard/#/catalog`: busca e filtro de endpoints existentes.
+- `/dashboard/#/playground`: parâmetros, exemplos copiáveis e resultado da leitura.
+- Navegação lateral separa workspace, desenvolvimento e administração. Em celular, vira menu expansível; Escape fecha o menu.
+- Saldo é obtido do backend. A interface não afirma que a API está online sem consultar um monitor de saúde.
+- Sessão e perfil aparecem no cabeçalho e na navegação; telas de login não exibem o workspace autenticado.
 
-## Diferenças de autenticação
+O login retorna ao endpoint selecionado. Links para contratos removidos exibem que o endpoint não foi encontrado, em vez de abrir uma demonstração. A interface também filtra entradas antigas de uma resposta de catálogo eventualmente armazenada em cache.
 
-A nova KRX guarda somente o hash das chaves e exibe a chave completa uma vez, ao criá-la. Por isso, o contrato antigo `keys-reveal` é documentação histórica e não será reativado nesse modelo. O playground não tenta reconstruir ou baixar uma chave completa existente.
+## Execução e credenciais
 
-Leituras atuais usam automaticamente o JWT da conta. Nos exemplos copiáveis, JWT e API key sempre são placeholders; valores reais da sessão não são incorporados. O uso de API key para executar serviços será conectado quando as integrações forem migradas. Esta etapa não cria chaves, não consulta provedores e não debita créditos para simular testes.
+A execução permite somente GET nos oito caminhos conhecidos, no mesmo domínio, sem redirecionamentos. JWT é enviado nas leituras privadas; planos públicos não recebem esse cabeçalho. Exemplos de cURL, JavaScript, TypeScript e Python contêm placeholders, nunca o token real da conta.
 
-## Integrações seguintes
+É possível cancelar uma leitura. O timeout é de 30 segundos e o limite da resposta é de 1 MiB. Código e respostas são renderizados como texto, inclusive quando o servidor retorna HTML ou erro. Resultado real fica separado da documentação dos campos e dos erros HTTP.
 
-A classificação prepara a migração por categoria: Free Fire usa o grupo `freefire`, Consultas usa `consultas`, e as demais categorias usam `normal`. Isso é metadata do catálogo, não enforcement de acesso ou de rate limit nesta etapa. Suporte, notificações e a implementação de Scraper Labs continuam no roteiro. Os contratos dessas funções já podem ser consultados quando presentes no legado.
+Chaves continuam guardadas por hash e são exibidas integralmente apenas uma vez, na criação. Não existe endpoint para recuperar uma chave completa antiga.
 
-## Validação
+## Deploy e verificação
+
+Não há nova variável de ambiente nem migração de banco nesta alteração. Faça o build e redeploy normal no Coolify. As variáveis de pagamentos permanecem conforme [o guia de planos e pagamentos](PLATFORM-PHASE-2.md).
 
 ```bash
 npm run build
@@ -77,6 +49,4 @@ npm test -- --runInBand
 npm run test:dashboard
 ```
 
-Os testes de catálogo verificam contagem, preservação de campos, ocultação de contratos administrativos, JWT/administrador e ausência de rotas de serviço. Testes de helpers validam sintaxe de JavaScript e Python dos exemplos dos 219 contratos, parâmetros, corpo JSON, multipart e arquivos binários. Os testes DOM exercitam busca, seleção, login com retorno, bloqueio de execução legada, sessão, destino, cancelamento, limites de resposta e resultados de erro.
-
-A validação desta etapa usa HTTP local nos controllers e DOM simulado. Não foi usado um navegador real nem houve consulta de provedor. Para conferir após o deploy no Coolify, abra o catálogo, teste `current-usage`, copie um exemplo de GPT e confirme que a execução de GPT continua desativada.
+Após o deploy, confira login, navegação em celular, lista de oito endpoints, leitura do saldo, retorno de erros e ocultação da administração para usuário comum. Testes automatizados usam controllers HTTP locais e DOM simulado; validação visual em navegador real precisa ser feita no ambiente publicado.

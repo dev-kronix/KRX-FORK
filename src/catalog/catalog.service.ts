@@ -1,6 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 export type ContractRoute = {
   id: string;
   name: string;
@@ -13,17 +11,90 @@ export type ContractRoute = {
   requiresAdmin?: boolean;
   [key: string]: any;
 };
-type Category = {
-  id: string;
-  name: string;
-  description: string;
-  order: number;
-  routes: ContractRoute[];
-};
-type Legacy = {
-  sourceArchive: string;
-  sourceSha256: string;
-  categories: Category[];
+const details: Record<
+  string,
+  { description: string; fields: [string, string][] }
+> = {
+  'current-account': {
+    description:
+      'Consulte os dados da conta autenticada, incluindo nome, e-mail, papel e estado.',
+    fields: [
+      ['id', 'Identificador da conta.'],
+      ['email', 'E-mail da conta.'],
+      ['firstName', 'Nome do usuário.'],
+      ['role', 'Papel da conta.'],
+      ['status', 'Estado cadastral.'],
+    ],
+  },
+  'current-keys': {
+    description:
+      'Liste suas chaves, prefixos, estado e datas de uso. A chave completa não é retornada.',
+    fields: [
+      ['[].maskedKey', 'Prefixo mascarado da chave.'],
+      ['[].status', 'Estado: active ou revoked.'],
+      ['[].lastUsedAt', 'Data do último uso, ou null.'],
+    ],
+  },
+  'current-usage': {
+    description:
+      'Consulte saldo disponível, número de requisições registradas e créditos consumidos.',
+    fields: [
+      ['balance', 'Saldo de créditos.'],
+      ['totalRequests', 'Requisições registradas.'],
+      ['totalSpent', 'Créditos consumidos.'],
+    ],
+  },
+  'current-recent': {
+    description:
+      'Consulte suas requisições registradas, com método, rota, estado HTTP, custo e data.',
+    fields: [
+      ['data', 'Requisições desta página.'],
+      ['hasNextPage', 'Indica se existe outra página.'],
+      ['page', 'Página atual.'],
+    ],
+  },
+  'current-ledger': {
+    description:
+      'Acompanhe cada entrada ou saída de créditos, o motivo e o saldo após a movimentação.',
+    fields: [
+      [
+        'data',
+        'Movimentações desta página: delta, balanceAfter, reason e createdAt.',
+      ],
+      ['hasNextPage', 'Indica se existe outra página.'],
+      ['page', 'Página atual.'],
+    ],
+  },
+  'current-plans': {
+    description:
+      'Consulte os planos que foram ativados e publicados, e a configuração de disponibilidade dos pagamentos.',
+    fields: [
+      ['plans', 'Planos ativos e públicos. Pode ser uma lista vazia.'],
+      [
+        'payments.enabled',
+        'Indica se as credenciais do checkout estão configuradas.',
+      ],
+      ['payments.sandbox', 'Indica ambiente de testes.'],
+    ],
+  },
+  'current-subscription': {
+    description:
+      'Consulte seu plano, validade e estado: gratuito, ativo, expirado ou em revisão.',
+    fields: [
+      ['plan', 'Condições da assinatura, ou null.'],
+      ['expiresAt', 'Vencimento, ou null.'],
+      ['status', 'free, active, expired ou review_required.'],
+    ],
+  },
+  'current-payments': {
+    description:
+      'Liste as compras da sua conta com valor, plano, status e confirmação do crédito.',
+    fields: [
+      ['data', 'Pagamentos desta página.'],
+      ['hasNextPage', 'Indica se existe outra página.'],
+      ['page', 'Página atual.'],
+    ],
+  },
 };
 const currentRoutes: ContractRoute[] = [
   ['current-account', 'Minha conta', '/api/v1/auth/me', 'session'],
@@ -55,15 +126,26 @@ const currentRoutes: ContractRoute[] = [
   executable: true,
   source: 'current',
   summary: name,
-  description: 'Endpoint de leitura da plataforma atual.',
+  description: details[id].description,
   contentType: 'application/json',
   body: null,
-  errors: [],
-  responses: [],
+  errors:
+    auth === 'session'
+      ? [
+          { status: 401, description: 'Sessão ausente ou inválida.' },
+          {
+            status: 403,
+            description: 'Conta sem permissão para esta leitura.',
+          },
+        ]
+      : [],
+  responses: [{ status: 200, description: details[id].description }],
   documentation: {
-    notes: [
-      'Retorna o contrato atual da plataforma NestJS. Não utiliza o envelope de serviços do legado.',
-    ],
+    fields: details[id].fields.map(([name, description]) => ({
+      name,
+      description,
+    })),
+    notes: ['A resposta é real e usa o formato do endpoint selecionado.'],
   },
   parameters: /\/(recent|ledger|payments)$/.test(path)
     ? [
@@ -88,74 +170,40 @@ const currentRoutes: ContractRoute[] = [
 }));
 @Injectable()
 export class CatalogService {
-  private readonly legacy: Legacy;
-  constructor() {
-    this.legacy = JSON.parse(
-      readFileSync(join(__dirname, 'contracts/legacy.json'), 'utf8'),
-    );
-    const ids = new Set<string>(currentRoutes.map((r) => r.id));
-    for (const c of this.legacy.categories)
-      for (const r of c.routes) {
-        if (
-          ids.has(r.id) ||
-          !r.path.startsWith('/api/') ||
-          !['GET', 'POST', 'PATCH', 'DELETE', 'PUT'].includes(r.method) ||
-          !['none', 'session', 'apiKey'].includes(r.auth)
-        )
-          throw new Error('Contrato legado inválido: ' + r.id);
-        ids.add(r.id);
-      }
-  }
-  catalog(admin = false) {
-    const categories = this.legacy.categories
-      .map((category) => ({
-        ...category,
-        accessGroup:
-          category.id === 'free-fire'
-            ? 'freefire'
-            : category.id === 'consultas'
-              ? 'consultas'
-              : 'normal',
-        routes: category.routes
-          .filter(
-            (r) => admin || (r.visibility !== 'admin' && !r.requiresAdmin),
-          )
-          .map((r) => ({
-            ...r,
-            legacyStatus: r.status,
-            status: 'planned',
-            active: false,
-            executable: false,
-            source: 'legacy',
-          })),
-      }))
-      .filter((c) => c.routes.length);
+  catalog() {
+    const groups = [
+      {
+        id: 'account',
+        name: 'Conta e chaves',
+        description: 'Sua identidade e suas credenciais de acesso.',
+        ids: ['current-account', 'current-keys'],
+      },
+      {
+        id: 'usage',
+        name: 'Créditos e consumo',
+        description: 'Saldo, requisições registradas e movimentações reais.',
+        ids: ['current-usage', 'current-recent', 'current-ledger'],
+      },
+      {
+        id: 'billing',
+        name: 'Planos e pagamentos',
+        description: 'Catálogo de planos, assinatura e compras da sua conta.',
+        ids: ['current-plans', 'current-subscription', 'current-payments'],
+      },
+    ];
     return {
       success: true,
       status: 200,
       data: {
-        version: 'platform-3',
-        sourceArchive: this.legacy.sourceArchive,
-        sourceSha256: this.legacy.sourceSha256,
-        legacyTotal: this.legacy.categories.reduce(
-          (n, c) => n + c.routes.length,
-          0,
-        ),
-        routeCount: categories.reduce(
-          (n, c) => n + c.routes.length,
-          currentRoutes.length,
-        ),
-        categories: [
-          {
-            id: 'platform',
-            name: 'Plataforma atual',
-            description: 'Leituras disponíveis na nova KRX.',
-            order: 0,
-            accessGroup: 'normal',
-            routes: currentRoutes,
-          },
-          ...categories,
-        ],
+        version: 'platform-4',
+        routeCount: currentRoutes.length,
+        categories: groups.map((g, order) => ({
+          id: g.id,
+          name: g.name,
+          description: g.description,
+          order,
+          routes: currentRoutes.filter((r) => g.ids.includes(r.id)),
+        })),
       },
     };
   }

@@ -1,50 +1,229 @@
 <!doctype html>
 <html lang="pt-BR">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#080b08">
-  <meta name="description" content="Dashboard oficial da KRX API">
-  <title>KRX Dashboard</title>
-  <link rel="stylesheet" href="/dashboard/styles.css">
-</head>
-<body>
-  <header class="topbar">
-    <a class="brand" href="/dashboard/">
-      <span class="brand-mark">K</span>
-      <span>KRX</span>
-      <small>API</small>
-    </a>
-    <button class="menu-button" id="menuButton" type="button" aria-label="Abrir menu">☰</button>
-    <nav id="nav">
-      <a href="#/">Painel</a>
-      <a href="#/keys">Chaves</a>
-      <a href="#/usage">Consumo</a>
-      <a href="#/catalog">Catálogo</a>
-      <a href="#/playground">Playground</a>
-      <a href="#/billing">Planos</a>
-      <a href="#/billing-admin" data-admin>Pagamentos</a>
-      <a href="#/credits" data-admin>Créditos</a>
-      <a href="#/users" data-admin>Usuários</a>
-      <a href="#/profile">Perfil</a>
-      <a href="/docs" target="_blank">Docs ↗</a>
-      <button type="button" class="nav-logout" id="logoutButton">Sair</button>
-    </nav>
-  </header>
-
-  <main id="app">
-    <section class="loading-shell">
-      <div class="eyebrow">KRX / DASHBOARD</div>
-      <h1>Carregando.</h1>
-    </section>
-  </main>
-
-  <footer>
-    <span>KRX API</span>
-    <span>krxdev.tech</span>
-  </footer>
-
-  <script src="/dashboard/playground.js" defer></script>
-  <script src="/dashboard/app.js" defer></script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#101318" />
+    <meta
+      name="description"
+      content="Gerencie sua conta, chaves, créditos e pagamentos na KRX."
+    />
+    <title>KRX · Workspace</title>
+    <link rel="stylesheet" href="/dashboard/styles.css" />
+  </head>
+  <body class="guest">
+    <a class="skip-link" href="#app">Ir para o conteúdo</a>
+    <header class="topbar">
+      <a class="brand" href="#/"
+        ><span class="brand-mark">K<span></span></span
+        ><span>KRX<small>Developer workspace</small></span></a
+      >
+      <button
+        class="menu-button"
+        id="menuButton"
+        type="button"
+        aria-label="Abrir navegação"
+        aria-controls="nav"
+        aria-expanded="false"
+      >
+        ☰
+      </button>
+      <nav id="nav" aria-label="Navegação principal">
+        <div class="nav-group">
+          <span class="nav-label">Workspace</span>
+          <a href="#/"
+            ><span class="nav-icon" aria-hidden="true"
+              ><svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z"
+                /></svg></span
+            >Visão geral</a
+          >
+          <a href="#/keys"
+            ><span class="nav-icon" aria-hidden="true"
+              ><svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M14 7a4 4 0 1 1-4-4 4 4 0 0 1 4 4Z M7 10l-4 4v6h4v-3h3l3-3"
+                /></svg></span
+            >Chaves de API</a
+          >
+          <a href="#/usage"
+            ><span class="nav-icon" aria-hidden="true"
+              ><svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M4 20V10 M10 20V4 M16 20v-8 M22 20H2" /></svg></span
+            >Créditos e consumo</a
+          >
+          <a href="#/billing"
+            ><span class="nav-icon" aria-hidden="true"
+              ><svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M3 6h18v14H3z M3 10h18 M15 15h3" /></svg></span
+            >Planos e pagamentos</a
+          >
+        </div>
+        <div class="nav-group">
+          <span class="nav-label">Desenvolvimento</span>
+          <a href="#/catalog"
+            ><span class="nav-icon" aria-hidden="true"
+              ><svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M8 5h13 M8 12h13 M8 19h13 M3 5h1 M3 12h1 M3 19h1"
+                /></svg></span
+            >Endpoints</a
+          >
+          <a href="#/playground"
+            ><span class="nav-icon" aria-hidden="true"
+              ><svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M8 4l13 8-13 8z" /></svg></span
+            >Playground</a
+          >
+          <a href="/docs" target="_blank" rel="noopener noreferrer"
+            ><span class="nav-icon" aria-hidden="true"
+              ><svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M7 17 17 7 M7 7h10v10" /></svg></span
+            >Documentação<span class="external-label">Swagger</span></a
+          >
+        </div>
+        <div class="nav-group" data-admin>
+          <span class="nav-label">Administração</span>
+          <a href="#/billing-admin"
+            ><span class="nav-icon" aria-hidden="true"
+              ><svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M3 8h18v12H3z M6 8V4h12v4 M3 12h18" /></svg></span
+            >Planos e vendas</a
+          >
+          <a href="#/credits"
+            ><span class="nav-icon" aria-hidden="true"
+              ><svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M4 6h16 M12 2v8 M4 18h16" /></svg></span
+            >Ajustes de créditos</a
+          >
+          <a href="#/users"
+            ><span class="nav-icon" aria-hidden="true"
+              ><svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M20 8v6 M17 11h6"
+                /></svg></span
+            >Usuários</a
+          >
+        </div>
+        <div class="nav-account">
+          <a href="#/profile"
+            ><span class="user-avatar" id="sidebarAvatar">K</span
+            ><span
+              ><strong id="sidebarName">Minha conta</strong
+              ><small>Perfil e segurança</small></span
+            ></a
+          ><button type="button" class="nav-logout" id="logoutButton">
+            Sair da conta
+            <span aria-hidden="true"
+              ><svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M7 17 17 7 M7 7h10v10" /></svg
+            ></span>
+          </button>
+        </div>
+      </nav>
+    </header>
+    <div class="workspace-header">
+      <div>
+        <span class="workspace-path">Workspace /</span
+        ><strong id="workspaceTitle">Visão geral</strong>
+      </div>
+      <div class="workspace-account">
+        <span class="session-dot"></span
+        ><span id="workspaceUser">Conta autenticada</span>
+      </div>
+    </div>
+    <main id="app" tabindex="-1">
+      <section class="loading-shell" aria-live="polite">
+        <span class="loading-indicator"></span>
+        <h1>Preparando seu workspace</h1>
+        <p class="muted">Carregando os dados da sua conta.</p>
+      </section>
+    </main>
+    <footer>
+      <span>KRX · Developer workspace</span
+      ><a href="/docs" target="_blank" rel="noopener noreferrer"
+        >Referência da API ↗</a
+      >
+    </footer>
+    <script src="/dashboard/playground.js" defer></script>
+    <script src="/dashboard/app.js" defer></script>
+  </body>
 </html>

@@ -155,4 +155,4 @@ O dashboard inclui catálogo de planos, compras avulsas pelo Mercado Pago, hist�
 
 ## Catálogo e playground
 
-O dashboard recupera 219 contratos antigos, organizados por categoria, com parâmetros, schemas e exemplos copiáveis. As integrações aguardam migração; oito leituras da plataforma atual podem ser executadas no playground. Consulte [o guia da terceira etapa](docs/PLATFORM-PHASE-3.md).
+O catálogo mostra somente oito leituras já implementadas, organizadas em conta, consumo e pagamentos. O playground executa essas leituras com a sessão do usuário e exibe resultados reais. Integrações que ainda não existem não aparecem no catálogo. Consulte [o guia da terceira etapa](docs/PLATFORM-PHASE-3.md).
