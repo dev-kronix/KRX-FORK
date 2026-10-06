@@ -13,6 +13,21 @@
   let currentUser = readUser();
   let pendingRefresh;
   let routeQueue = Promise.resolve();
+  const returnParams = new URLSearchParams(location.search);
+  const returnOrder = returnParams.get('external_reference');
+  const returnPayment =
+    returnParams.get('payment_id') || returnParams.get('collection_id');
+  let checkoutReturn =
+    /^[a-f0-9-]{36}$/i.test(returnOrder || '') &&
+    /^\d{1,30}$/.test(returnPayment || '')
+      ? { orderId: returnOrder, providerPaymentId: returnPayment }
+      : null;
+  if (
+    returnParams.has('external_reference') ||
+    returnParams.has('payment_id') ||
+    returnParams.has('collection_id')
+  )
+    history.replaceState(null, '', location.pathname + location.hash);
 
   function esc(value) {
     return String(value ?? '').replace(
@@ -778,6 +793,452 @@
       });
   }
 
+  const paymentLabels = {
+    creating: 'Preparando checkout',
+    checkout_error: 'Checkout indisponível',
+    pending: 'Pendente',
+    in_process: 'Em análise',
+    authorized: 'Autorizado',
+    approved: 'Aprovado',
+    rejected: 'Recusado',
+    cancelled: 'Cancelado',
+    refunded: 'Reembolsado',
+    charged_back: 'Contestação',
+    review_required: 'Revisão necessária',
+    review_resolved: 'Revisão encerrada',
+  };
+  const money = (cents) =>
+    new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(cents / 100);
+  const billingDate = (value) =>
+    value ? new Date(value).toLocaleString('pt-BR') : '—';
+  function safeCheckout(url) {
+    const parsed = new URL(url);
+    if (
+      parsed.protocol !== 'https:' ||
+      !/(^|\.)mercadopago\.(com|com\.br)$/.test(parsed.hostname)
+    )
+      throw new Error('Link de pagamento inválido.');
+    return parsed.href;
+  }
+  function billingError(error) {
+    notice(error.message, true);
+  }
+  async function billingView() {
+    setNav(true);
+    app.innerHTML =
+      '<div class="eyebrow">KRX / PLANOS</div><h1>Planos e pagamentos.</h1><div id="notice" hidden></div><p>Carregando...</p>';
+    try {
+      const [catalog, subscription, recent] = await Promise.all([
+        api('/billing/plans'),
+        api('/billing/subscription'),
+        api('/billing/payments?page=1&limit=100'),
+      ]);
+      const latestPlans = new Set();
+      recent.data.forEach((p) => {
+        if (latestPlans.has(p.planId)) return;
+        latestPlans.add(p.planId);
+        if (p.creditedAt)
+          sessionStorage.removeItem(
+            'krx.checkout.' + currentUser.id + '.' + p.planId,
+          );
+      });
+      const status = {
+        active: 'Ativo',
+        expired: 'Expirado',
+        free: 'Gratuito',
+        review_required: 'Pagamento em revisão',
+      }[subscription.status];
+      app.innerHTML =
+        '<div class="eyebrow">KRX / PLANOS</div><h1>Planos e pagamentos.</h1><div id="notice" hidden></div>' +
+        '<article class="card"><h2>' +
+        esc(
+          subscription.status === 'active' ? subscription.plan.name : status,
+        ) +
+        '</h2><p class="muted">' +
+        esc(status) +
+        (subscription.expiresAt
+          ? ' · Validade: ' + esc(billingDate(subscription.expiresAt))
+          : '') +
+        '</p><a class="button alt" href="#/payments">Histórico de pagamentos</a></article>' +
+        '<p class="muted">Compra avulsa, sem renovação automática. Os créditos entram após a confirmação do pagamento.</p>' +
+        (!catalog.payments.enabled
+          ? '<p class="notice">Pagamentos ainda não configurados.</p>'
+          : catalog.payments.sandbox
+            ? '<p class="notice">Ambiente de testes. Não use pagamentos reais.</p>'
+            : '') +
+        '<section class="grid">' +
+        catalog.plans
+          .map(
+            (plan) =>
+              '<article class="card"><h2>' +
+              esc(plan.name) +
+              '</h2><p>' +
+              esc(plan.description) +
+              '</p><strong>' +
+              esc(money(plan.priceCents)) +
+              '</strong><p class="muted">' +
+              esc(plan.creditsPerCycle.toLocaleString('pt-BR')) +
+              ' créditos · ' +
+              esc(plan.billingPeriodDays) +
+              ' dias<br>' +
+              esc(plan.maxActiveKeys) +
+              ' chaves ativas</p><button class="button" data-checkout="' +
+              esc(plan.id) +
+              '" ' +
+              (!catalog.payments.enabled ||
+              subscription.status === 'review_required'
+                ? 'disabled'
+                : '') +
+              '>Comprar ' +
+              esc(plan.name) +
+              '</button><button class="button alt" data-new-checkout="' +
+              esc(plan.id) +
+              '" ' +
+              (!catalog.payments.enabled ||
+              subscription.status === 'review_required'
+                ? 'disabled'
+                : '') +
+              '>Preparar outra compra</button><div class="checkout-link"></div></article>',
+          )
+          .join('') +
+        '</section>' +
+        (!catalog.plans.length
+          ? '<p class="muted">Nenhum plano disponível no momento.</p>'
+          : '');
+      document.querySelectorAll('[data-new-checkout]').forEach(
+        (button) =>
+          (button.onclick = () => {
+            if (
+              !confirm(
+                'Consulte seu histórico antes: outra compra gera um checkout separado. Continuar?',
+              )
+            )
+              return;
+            sessionStorage.removeItem(
+              'krx.checkout.' +
+                currentUser.id +
+                '.' +
+                button.dataset.newCheckout,
+            );
+            const checkoutButton =
+              button.parentElement.querySelector('[data-checkout]');
+            checkoutButton.disabled = false;
+            checkoutButton.textContent = 'Comprar';
+            button.parentElement.querySelector('.checkout-link').innerHTML = '';
+            notice(
+              'Nova compra preparada. Clique em Comprar para abrir outro checkout.',
+            );
+          }),
+      );
+      document.querySelectorAll('[data-checkout]').forEach((button) =>
+        button.addEventListener('click', async () => {
+          button.disabled = true;
+          const planId = button.dataset.checkout;
+          const storageKey = 'krx.checkout.' + currentUser.id + '.' + planId;
+          const requestId =
+            sessionStorage.getItem(storageKey) || crypto.randomUUID();
+          sessionStorage.setItem(storageKey, requestId);
+          try {
+            const payment = await api('/billing/checkout', {
+              method: 'POST',
+              body: JSON.stringify({ planId, requestId }),
+            });
+            const url = safeCheckout(payment.checkoutUrl);
+            button.parentElement.querySelector('.checkout-link').innerHTML =
+              '<p><a class="button" href="' +
+              esc(url) +
+              '" target="_blank" rel="noopener noreferrer">Abrir Mercado Pago ↗</a></p><p class="muted">Após pagar, consulte o histórico para confirmar o status.</p>';
+            button.textContent = 'Checkout preparado';
+            notice('Checkout preparado. Continue no Mercado Pago.');
+          } catch (error) {
+            billingError(error);
+            button.disabled = false;
+          }
+        }),
+      );
+    } catch (error) {
+      billingError(error);
+    }
+  }
+  async function paymentsView(page = 1, admin = false) {
+    setNav(true);
+    if (admin && roleName(currentUser) !== 'admin') {
+      app.innerHTML = '<h1>Sem permissão.</h1>';
+      return;
+    }
+    app.innerHTML =
+      '<div class="eyebrow">KRX / ' +
+      (admin ? 'ADMIN' : 'PAGAMENTOS') +
+      '</div><h1>Histórico de pagamentos.</h1><div id="notice" hidden></div>';
+    try {
+      const prefix = admin ? '/admin/billing' : '/billing';
+      const result = await api(prefix + '/payments?page=' + page + '&limit=20');
+      app.insertAdjacentHTML(
+        'beforeend',
+        '<div class="actions"><a class="button alt" href="' +
+          (admin ? '#/billing-admin' : '#/billing') +
+          '">Voltar aos planos</a></div><div class="table-wrap"><table><thead><tr><th>Compra</th>' +
+          (admin ? '<th>Usuário</th>' : '') +
+          '<th>Plano</th><th>Valor</th><th>Status</th><th>Data</th><th>Ações</th></tr></thead><tbody>' +
+          result.data
+            .map(
+              (p) =>
+                '<tr><td><code>' +
+                esc(p.id) +
+                '</code></td>' +
+                (admin ? '<td>' + esc(p.userId) + '</td>' : '') +
+                '<td>' +
+                esc(p.planName) +
+                '</td><td>' +
+                esc(money(p.amountCents)) +
+                '</td><td>' +
+                esc(paymentLabels[p.status] || p.status) +
+                '</td><td>' +
+                esc(billingDate(p.createdAt)) +
+                '</td><td><button class="button alt" data-reconcile="' +
+                esc(p.id) +
+                '">Verificar</button>' +
+                (p.checkoutUrl && p.status === 'pending'
+                  ? '<a class="button alt" href="' +
+                    esc(safeCheckout(p.checkoutUrl)) +
+                    '" target="_blank" rel="noopener noreferrer">Pagar ↗</a>'
+                  : '') +
+                '</td></tr>',
+            )
+            .join('') +
+          '</tbody></table></div>' +
+          (!result.data.length
+            ? '<p class="muted">Nenhum pagamento registrado.</p>'
+            : '') +
+          '<div class="actions"><button class="button alt" id="billingPrevious" ' +
+          (page === 1 ? 'disabled' : '') +
+          '>Anterior</button><span>Página ' +
+          page +
+          '</span><button class="button alt" id="billingNext" ' +
+          (!result.hasNextPage ? 'disabled' : '') +
+          '>Próxima</button></div><div id="reconcileArea"></div>',
+      );
+      document.querySelector('#billingPrevious').onclick = () =>
+        paymentsView(page - 1, admin);
+      document.querySelector('#billingNext').onclick = () =>
+        paymentsView(page + 1, admin);
+      document.querySelectorAll('[data-reconcile]').forEach(
+        (button) =>
+          (button.onclick = () => {
+            const payment = result.data.find(
+              (p) => p.id === button.dataset.reconcile,
+            );
+            document.querySelector('#reconcileArea').innerHTML =
+              '<article class="card"><h2>Verificar pagamento</h2><p class="muted">Informe o número do pagamento no comprovante do Mercado Pago. A KRX consultará o provedor.</p><form id="reconcileForm"><label for="providerPaymentId">Número do pagamento</label><input id="providerPaymentId" name="providerPaymentId" inputmode="numeric" pattern="[0-9]{1,30}" maxlength="30" value="' +
+              esc(payment.providerPaymentId || '') +
+              '" required><button class="button">Consultar</button></form></article>';
+            document.querySelector('#reconcileForm').onsubmit = async (
+              event,
+            ) => {
+              event.preventDefault();
+              const form = event.currentTarget;
+              const submit = form.querySelector('button');
+              submit.disabled = true;
+              try {
+                await api(prefix + '/payments/' + payment.id + '/reconcile', {
+                  method: 'POST',
+                  body: JSON.stringify({
+                    providerPaymentId: form.elements.providerPaymentId.value,
+                  }),
+                });
+                await paymentsView(page, admin);
+                notice('Status atualizado após consulta ao Mercado Pago.');
+              } catch (error) {
+                billingError(error);
+                submit.disabled = false;
+              }
+            };
+          }),
+      );
+    } catch (error) {
+      billingError(error);
+    }
+  }
+  async function billingAdminView() {
+    setNav(true);
+    if (roleName(currentUser) !== 'admin') {
+      app.innerHTML = '<h1>Sem permissão.</h1>';
+      return;
+    }
+    app.innerHTML =
+      '<div class="eyebrow">KRX / ADMIN</div><h1>Administrar planos.</h1><div id="notice" hidden></div>';
+    try {
+      const plans = await api('/admin/billing/plans');
+      app.insertAdjacentHTML(
+        'beforeend',
+        '<div class="actions"><a class="button alt" href="#/billing-payments">Todos os pagamentos</a><button class="button" id="newPlan">Novo plano</button></div><section class="grid">' +
+          plans
+            .map(
+              (p) =>
+                '<article class="card"><h2>' +
+                esc(p.name) +
+                '</h2><p>' +
+                esc(money(p.priceCents)) +
+                ' · ' +
+                (p.active ? 'Ativo' : 'Desativado') +
+                ' · ' +
+                (p.public ? 'Público' : 'Privado') +
+                '</p><button class="button alt" data-edit-plan="' +
+                esc(p.id) +
+                '">Editar</button></article>',
+            )
+            .join('') +
+          '</section><div id="planEditor"></div><article class="card"><h2>Encerrar revisão de pagamento</h2><p class="muted">Revise o estorno e ajuste os créditos na área Créditos antes de encerrar. O encerramento libera a conta com acesso gratuito.</p><form id="reviewForm"><label for="reviewUser">ID do usuário</label><input id="reviewUser" name="userId" type="number" min="1" required><label for="reviewReason">Motivo e providências</label><input id="reviewReason" name="reason" maxlength="240" required><button class="button">Encerrar revisão</button></form></article>',
+      );
+      const numberFields = [
+        ['priceCents', 'Preço em centavos', 100, 100000000],
+        ['creditsPerCycle', 'Créditos por compra', 1, 100000000],
+        ['billingPeriodDays', 'Validade em dias', 1, 366],
+        ['maxActiveKeys', 'Máximo de chaves ativas', 1, 100],
+        ['apiRateLimit', 'Limite planejado por minuto', 1, 10000],
+      ];
+      const boolFields = [
+        ['normal', 'Categoria geral'],
+        ['freefire', 'Free Fire'],
+        ['consultas', 'Consultas'],
+        ['active', 'Ativo'],
+        ['public', 'Visível no catálogo'],
+      ];
+      const edit = (
+        p = {
+          id: '',
+          name: '',
+          description: '',
+          priceCents: 1290,
+          creditsPerCycle: 100000,
+          billingPeriodDays: 30,
+          maxActiveKeys: 5,
+          apiRateLimit: 30,
+          normal: true,
+          freefire: false,
+          consultas: false,
+          active: false,
+          public: false,
+        },
+      ) => {
+        document.querySelector('#planEditor').innerHTML =
+          '<article class="card"><h2>Editar plano</h2><p class="muted">Mudanças valem para novas compras. Categorias e limite por minuto serão aplicados na migração das rotas.</p><form id="planForm"><label for="planId">Identificador</label><input id="planId" name="id" pattern="[a-z][a-z0-9-]{1,39}" value="' +
+          esc(p.id) +
+          '" ' +
+          (p.id ? 'readonly' : '') +
+          ' required><label for="planName">Nome</label><input id="planName" name="name" maxlength="80" value="' +
+          esc(p.name) +
+          '" required><label for="planDescription">Descrição</label><input id="planDescription" name="description" maxlength="400" value="' +
+          esc(p.description) +
+          '">' +
+          numberFields
+            .map(
+              ([field, label, min, max]) =>
+                '<label for="plan-' +
+                field +
+                '">' +
+                label +
+                '</label><input id="plan-' +
+                field +
+                '" name="' +
+                field +
+                '" type="number" min="' +
+                min +
+                '" max="' +
+                max +
+                '" step="1" value="' +
+                esc(p[field]) +
+                '" required>',
+            )
+            .join('') +
+          boolFields
+            .map(
+              ([field, label]) =>
+                '<label class="check-field"><input type="checkbox" name="' +
+                field +
+                '" ' +
+                (p[field] ? 'checked' : '') +
+                '> ' +
+                label +
+                '</label>',
+            )
+            .join('') +
+          '<button class="button">Salvar plano</button></form></article>';
+        document.querySelector('#planForm').onsubmit = async (event) => {
+          event.preventDefault();
+          const form = event.currentTarget;
+          const button = form.querySelector('button');
+          button.disabled = true;
+          const dto = {
+            id: form.elements.id.value,
+            name: form.elements.name.value,
+            description: form.elements.description.value,
+          };
+          numberFields.forEach(
+            ([f]) => (dto[f] = Number(form.elements[f].value)),
+          );
+          boolFields.forEach(([f]) => (dto[f] = form.elements[f].checked));
+          try {
+            await api('/admin/billing/plans', {
+              method: 'POST',
+              body: JSON.stringify(dto),
+            });
+            await billingAdminView();
+            notice(
+              'Plano salvo. Compras anteriores mantêm as condições originais.',
+            );
+          } catch (error) {
+            billingError(error);
+            button.disabled = false;
+          }
+        };
+      };
+      document.querySelector('#newPlan').onclick = () => edit();
+      document
+        .querySelectorAll('[data-edit-plan]')
+        .forEach(
+          (b) =>
+            (b.onclick = () =>
+              edit(plans.find((p) => p.id === b.dataset.editPlan))),
+        );
+      document.querySelector('#reviewForm').onsubmit = async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const button = form.querySelector('button');
+        button.disabled = true;
+        const reason = form.elements.reason.value.trim();
+        if (!reason) {
+          notice('Informe o motivo da revisão.', true);
+          button.disabled = false;
+          return;
+        }
+        if (!confirm('Encerrar a revisão e expirar o plano deste usuário?')) {
+          button.disabled = false;
+          return;
+        }
+        try {
+          await api(
+            '/admin/billing/reviews/' +
+              Number(form.elements.userId.value) +
+              '/resolve',
+            { method: 'POST', body: JSON.stringify({ reason }) },
+          );
+          notice('Revisão encerrada. A conta volta ao acesso gratuito.');
+          form.reset();
+        } catch (error) {
+          billingError(error);
+        } finally {
+          button.disabled = false;
+        }
+      };
+    } catch (error) {
+      billingError(error);
+    }
+  }
+
   async function logout() {
     try {
       await api('/auth/logout', { method: 'POST' });
@@ -803,6 +1264,37 @@
       return loginView();
     }
 
+    if (checkoutReturn) {
+      const pending = checkoutReturn;
+      checkoutReturn = null;
+      let message;
+      let failed = false;
+      try {
+        const payment = await api(
+          '/billing/payments/' + pending.orderId + '/reconcile',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              providerPaymentId: pending.providerPaymentId,
+            }),
+          },
+        );
+        message =
+          'Pagamento consultado: ' +
+          (paymentLabels[payment.status] || payment.status);
+      } catch (error) {
+        message = error.message;
+        failed = true;
+      }
+      history.replaceState(null, '', location.pathname + '#/payments');
+      await paymentsView();
+      notice(message, failed);
+      return;
+    }
+    if (hash === '#/billing') return billingView();
+    if (hash === '#/payments') return paymentsView();
+    if (hash === '#/billing-admin') return billingAdminView();
+    if (hash === '#/billing-payments') return paymentsView(1, true);
     if (hash === '#/keys') return keysView();
     if (hash === '#/usage') return usageView();
     if (hash === '#/credits') return creditsView();

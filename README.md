@@ -147,4 +147,8 @@ Este projeto é distribuído sob licença MIT e foi inicialmente derivado do pro
 
 O dashboard em `/dashboard/` inclui gerenciamento de chaves, saldo, consumo e ajustes administrativos. Confirmação de e-mail e redefinição de senha também são atendidas pelo dashboard.
 
-Consulte [o guia da primeira etapa](docs/PLATFORM-PHASE-1.md) para migração no Coolify, contratos HTTP e limites da implementação. Rotas de serviços e pagamentos serão adicionados nas próximas etapas.
+Consulte [o guia da primeira etapa](docs/PLATFORM-PHASE-1.md) para migração no Coolify, contratos HTTP e limites da implementação. Rotas de serviços serão adicionadas nas próximas etapas.
+
+## Planos e pagamentos
+
+O dashboard inclui catálogo de planos, compras avulsas pelo Mercado Pago, histórico e administração. Planos recuperados começam desativados. Consulte [o guia da segunda etapa](docs/PLATFORM-PHASE-2.md) para migração, configuração no Coolify, webhook, testes e regras de revisão de pagamentos.

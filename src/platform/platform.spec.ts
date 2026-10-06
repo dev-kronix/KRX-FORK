@@ -1,4 +1,5 @@
 import validationOptions from '../utils/validation-options';
+import { Billing1791325000000 } from '../database/migrations/1791325000000-Billing';
 import { PGlite } from '@electric-sql/pglite';
 import { DataSource, QueryRunner } from 'typeorm';
 import { randomUUID } from 'crypto';
@@ -37,6 +38,9 @@ describe('Platform foundation (PostgreSQL)', () => {
       CREATE TABLE "user" ("id" integer PRIMARY KEY, "roleId" integer, "statusId" integer, "deletedAt" timestamp);
       INSERT INTO "user" VALUES (1,1,1,NULL), (2,2,1,NULL), (3,2,1,NULL), (4,2,2,NULL);`);
     await new PlatformFoundation1791323000000().up({
+      query: (sql: string) => pg.exec(sql),
+    } as unknown as QueryRunner);
+    await new Billing1791325000000().up({
       query: (sql: string) => pg.exec(sql),
     } as unknown as QueryRunner);
     const raw = (

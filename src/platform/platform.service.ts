@@ -64,6 +64,32 @@ export class PlatformService {
     return account as { balance: number };
   }
 
+  async billingAccess(
+    userId: number,
+    manager: EntityManager = this.db.manager,
+  ) {
+    const [subscription] = await manager.query(
+      'SELECT "snapshot", "expiresAt", "held" FROM "billing_subscription" WHERE "userId" = $1',
+      [userId],
+    );
+    if (subscription?.held)
+      throw new ForbiddenException(
+        'Pagamento em revisão. Contate a administração.',
+      );
+    const active =
+      subscription && new Date(subscription.expiresAt).getTime() > Date.now();
+    return active
+      ? subscription.snapshot
+      : {
+          id: 'free',
+          maxActiveKeys: 5,
+          apiRateLimit: 30,
+          normal: true,
+          freefire: false,
+          consultas: false,
+        };
+  }
+
   private publicKey(key: KeyRecord) {
     return {
       ...key,
@@ -89,8 +115,11 @@ export class PlatformService {
         'SELECT count(*)::int AS count FROM "api_key" WHERE "userId" = $1 AND "revokedAt" IS NULL',
         [userId],
       );
-      if (count >= 5)
-        throw new ConflictException('Limite de cinco chaves ativas atingido.');
+      const plan = await this.billingAccess(userId, manager);
+      if (count >= plan.maxActiveKeys)
+        throw new ConflictException(
+          'Limite de ' + plan.maxActiveKeys + ' chaves ativas atingido.',
+        );
       const key = 'krx_live_' + randomBytes(32).toString('hex');
       const [record] = await manager.query(
         `INSERT INTO "api_key" ("id", "userId", "name", "prefix", "hash") VALUES ($1,$2,$3,$4,$5) RETURNING ${publicKeyColumns}`,
@@ -126,6 +155,7 @@ export class PlatformService {
       [this.hash(rawKey)],
     );
     if (!key) throw new UnauthorizedException('Chave inválida ou revogada.');
+    await this.billingAccess(key.userId);
     return { userId: key.userId, keyId: key.id };
   }
 
@@ -231,6 +261,7 @@ export class PlatformService {
     return this.db.transaction(async (manager) => {
       await this.activeUser(input.userId, manager);
       const account = await this.account(input.userId, manager);
+      await this.billingAccess(input.userId, manager);
       const [key] = await manager.query(
         'SELECT "id" FROM "api_key" WHERE "id" = $1 AND "userId" = $2 AND "revokedAt" IS NULL',
         [input.keyId, input.userId],
