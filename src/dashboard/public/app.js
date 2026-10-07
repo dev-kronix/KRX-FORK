@@ -237,7 +237,7 @@
   function loginView() {
     setNav(false);
     app.innerHTML =
-      '<section class="auth-wrap"><div class="auth">' +
+      '<section class="auth-wrap"><aside class="auth-story"><a class="brand" href="#/login" aria-label="KRX API"><span class="brand-mark">K</span><span>KRX<small>API · Workspace</small></span></a><div class="eyebrow">SEU PRÓXIMO PROJETO</div><h2>Uma conta.<br>Seu ponto de <span>partida.</span></h2><p>Gerencie suas chaves, acompanhe o consumo e teste os endpoints disponíveis em um único workspace.</p><div class="auth-details"><div><strong>Credenciais sob seu controle</strong><span>Crie e revogue suas chaves pelo painel.</span></div><div><strong>Consumo com histórico</strong><span>Confira seu saldo e cada movimento de créditos.</span></div><div><strong>Teste antes de integrar</strong><span>Inspecione respostas reais no playground.</span></div></div></aside><div class="auth">' +
       '<div class="eyebrow">KRX / ACESSO</div><h1>Entre na KRX.</h1>' +
       '<p class="muted">Gerencie sua conta e os recursos da API em um só lugar.</p>' +
       '<div class="auth-card"><div id="notice" hidden></div>' +
@@ -1429,7 +1429,7 @@
         readablePaths.has(route.path);
       app.insertAdjacentHTML(
         'beforeend',
-        '<section class="card"><label for="playgroundRoute">Endpoint</label><select id="playgroundRoute">' +
+        '<section class="card playground-contract"><div class="contract-selector"><label for="playgroundRoute">Endpoint</label><select id="playgroundRoute">' +
           catalog.categories
             .map(
               (c) =>
@@ -1451,13 +1451,13 @@
                 '</optgroup>',
             )
             .join('') +
-          '</select><h2>' +
+          '</select></div><div class="contract-summary"><h2>' +
           esc(route.name) +
           '</h2><code>' +
           esc(route.method + ' ' + route.path) +
           '</code><p>' +
           esc(route.description) +
-          '</p><p class="muted">' +
+          '</p></div><div class="contract-auth"><span class="step-label">ACESSO E EXECUÇÃO</span><p class="muted">' +
           esc(authLabel[route.auth]) +
           ' · ' +
           esc(route.credits) +
@@ -1467,7 +1467,7 @@
           (!canRun
             ? '<p class="notice">Este endpoint não está disponível para execução. Escolha outro endpoint.</p>'
             : '<p class="notice">Usa a sessão desta conta. Os exemplos copiados contêm apenas placeholders de credenciais.</p>') +
-          '</section><section class="grid two"><article class="card"><h2>Requisição</h2><form id="playgroundForm">' +
+          '</div></section><section class="grid two workbench"><article class="card"><h2>Requisição</h2><form id="playgroundForm">' +
           (route.parameters || [])
             .map(
               (p, i) =>
