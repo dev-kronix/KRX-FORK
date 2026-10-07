@@ -50,3 +50,9 @@ npm run test:dashboard
 ```
 
 Após o deploy, confira login, navegação em celular, lista de oito endpoints, leitura do saldo, retorno de erros e ocultação da administração para usuário comum. Testes automatizados usam controllers HTTP locais e DOM simulado; validação visual em navegador real precisa ser feita no ambiente publicado.
+
+## Identidade visual
+
+O workspace usa preto e verde-lima, tipografia com hierarquia mais forte e navegação agrupada. O login apresenta contexto do produto ao lado do formulário; em telas pequenas os blocos são empilhados. O catálogo distribui os endpoints implementados em cards, preservando busca, categoria e autenticação. O playground separa seleção/contrato, parâmetros, exemplos e resultado real. As telas de planos, administração, suporte e notificações compartilham o mesmo sistema de cores e controles.
+
+A reformulação não adiciona contratos nem altera o banco. O build e os testes de DOM validam os fluxos existentes. A prévia local não é acessível pelo navegador remoto; a conferência visual no domínio deve ocorrer após o redeploy no Coolify.
